@@ -192,7 +192,7 @@ function vResultado() {
       <div><span class="categoria">${esc(p.categoria)}</span><div class="nombre-grande" style="--tam:${tamNombre(p.nombre, 96)};margin:16px 0 10px">${esc(p.nombre)}</div>
       <div class="solo-publico"><div class="t">CALIFICACIÓN DEL PÚBLICO</div>
         <div class="v">${pub.nota === null || pub.nota === undefined ? '—' : num(pub.nota, 2)}</div>
-        <div class="d">Promedio de ${Number(pub.votos || 0).toLocaleString('es-CO')} ${pub.votos === 1 ? 'voto' : 'votos'} · La nota de los jurados se conocerá en la premiación</div></div>
+        <div class="d">${R.parcial ? 'Nota parcial · ' : ''}Promedio de ${Number(pub.votos || 0).toLocaleString('es-CO')} ${pub.votos === 1 ? 'voto' : 'votos'}${R.parcial ? ' · Puede cambiar hasta el cierre de las votaciones' : ''} · La nota de los jurados se conocerá en la premiación</div></div>
       </div></div>`;
     if (cambio('resultado', h)) $('#v-resultado').innerHTML = h;
     return;

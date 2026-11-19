@@ -36,6 +36,10 @@
   .cuenta-cierre { margin: 10px 0 0; padding: 10px 12px; border-radius: 12px; background: #d94b50; color: #fff; font-weight: 800; animation: latido 1s infinite; }
   .cuenta-cierre b { font-size: 1.4em; }
   @keyframes latido { 50% { filter: brightness(1.25); } }
+  .pendientes .pend { display: flex; width: 100%; align-items: center; gap: 12px; text-align: left; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: inherit; border-radius: 12px; padding: 8px; margin: 6px 0; font: inherit; cursor: pointer; }
+  .pendientes .pend img { width: 44px; height: 54px; object-fit: cover; border-radius: 8px; }
+  .pendientes .pend > span:nth-child(2) { flex: 1; }
+  .pendientes .ir { color: var(--oro, #f5c451); font-weight: 800; white-space: nowrap; }
   .en-escena { display: flex; gap: 12px; align-items: center; text-align: left; background: rgba(0,0,0,.25); border-radius: 14px; padding: 10px; margin-top: 12px; }
   .en-escena img { width: 64px; border-radius: 10px; }
   .intro { display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(245,196,81,.2), rgba(255,122,26,.15)); border: 1px solid rgba(245,196,81,.35); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; }
@@ -71,6 +75,7 @@ let reg = local.get('bc_registro', null);        // { num, nombre, finalista, k 
 let misVotos = local.get('bc_votos', {});       // { cid: nota }
 let participantes = {}, estado = {}, registroAbierto = true;
 let seleccion = null, enviando = false, firma = '', ultimoCid = null;
+let presentados = {}, presV = null, objetivo = null, ultimoMostrado = null;   // calificaciones pendientes
 let pantallaRegistro = null;                     // null | 'form' | 'confirmar'
 let borrador = { nombre: local.get('bc_nombre', ''), num: '', finalista: '' };
 
@@ -99,6 +104,8 @@ async function consultar() {
     }
     if (!reg) { try { const r = await leer('registro'); const ab = !!(r && r.abierto === true); if (ab !== registroAbierto) { registroAbierto = ab; firma = ''; } } catch (x) {} }
     estado = e;
+    // lista de participantes que ya cantaron: solo se vuelve a pedir cuando cambia
+    if (e.votacionGeneral === true && e.presentadosV !== presV) { try { presentados = (await leer('presentados')) || {}; presV = e.presentadosV; } catch (x) {} }
     if (estado.cantanteId !== ultimoCid) { ultimoCid = estado.cantanteId; seleccion = null; }
     if ((estado.cantanteId && !participantes[estado.cantanteId]) || Date.now() - partT > 180000) { partT = Date.now(); await cargarParticipantes(); }
   } catch (e) { marcarConexion(false); }
@@ -205,42 +212,69 @@ function pintar() {
   const abierta = estado.votacion === 'ABIERTA' && !!p;
   const yaVoto = misVotos[cid] !== undefined;
   const enCuenta = abierta && estado.quedan != null;
-  const f = ['v', cid, abierta, yaVoto, enviando, !!p, enCuenta].join('|');
+  const pend = pendientes(abierta ? cid : null);
+  if (objetivo && !pend.includes(objetivo)) objetivo = null;
+  const mostrado = abierta && !yaVoto ? cid : objetivo;
+  if (mostrado !== ultimoMostrado) { seleccion = null; ultimoMostrado = mostrado; }
+  const f = ['v', cid, abierta, yaVoto, enviando, !!p, enCuenta, objetivo, pend.join(',')].join('|');
   if (f === firma) { const cn = $('#cuenta-n'); if (cn) cn.textContent = estado.quedan; return; }
   firma = f;
 
-  setTimeout(() => { const o = $('#otra'); if (o) o.onclick = (ev) => { ev.preventDefault(); otraBoleta(); }; }, 0);
+  setTimeout(() => {
+    const o = $('#otra'); if (o) o.onclick = (ev) => { ev.preventDefault(); otraBoleta(); };
+    document.querySelectorAll('[data-pend]').forEach((b) => (b.onclick = () => { objetivo = b.dataset.pend; seleccion = null; firma = ''; pintar(); window.scrollTo(0, 0); }));
+    const vol = $('#volver'); if (vol) vol.onclick = (ev) => { ev.preventDefault(); objetivo = null; seleccion = null; firma = ''; pintar(); };
+  }, 0);
   if (enviando) {
     app.innerHTML = `<section class="tarjeta espera"><div class="giro"></div><h2>Enviando tu calificación…</h2>
       <p class="suave" id="txt-enviando">No cierres esta página hasta ver «¡Gracias por calificar!».</p></section>`;
     return;
   }
-  if (abierta && !yaVoto) {
-    app.innerHTML = `<section class="tarjeta cantante">
-        <span class="etiqueta-vivo">VOTACIÓN ABIERTA</span><br>
-        ${enCuenta ? `<div class="cuenta-cierre">⏳ La votación se cierra en <b id="cuenta-n">${estado.quedan}</b> s · ¡envía tu nota ya!</div>` : ''}
-        <img class="foto" src="${foto(p)}" alt="${esc(p.nombre)}">
-        <h2>${esc(p.nombre)}</h2>
-        <div class="suave">${esc(p.categoria)}${p.cancion ? ' · «' + esc(p.cancion) + '»' : ''}</div>
+  const tarjetaVoto = (q, qid, etiqueta, extra = '') => `<section class="tarjeta cantante">
+        <span class="etiqueta-vivo">${etiqueta}</span><br>${extra}
+        <img class="foto" src="${foto(q)}" alt="${esc(q.nombre)}">
+        <h2>${esc(q.nombre)}</h2>
+        <div class="suave">${esc(q.categoria)}${q.cancion ? ' · «' + esc(q.cancion) + '»' : ''}</div>
         <p style="margin:16px 0 0;font-weight:700">¿Qué nota le das? <span class="suave">(0 a 10)</span></p>
         <div class="notas">${[0,1,2,3,4,5,6,7,8,9,10].map((n) => `<button class="nota${n === 10 ? ' diez' : ''}" data-n="${n}">${n}</button>`).join('')}</div>
         <button class="boton bloque verde" id="enviar" disabled>Enviar calificación</button>
-      </section>${tarjetaRegistro()}`;
+      </section>`;
+  const activarVoto = (qid) => {
     document.querySelectorAll('.nota').forEach((b) => {
       if (Number(b.dataset.n) === seleccion) b.classList.add('elegida');
       b.onclick = () => { seleccion = Number(b.dataset.n); document.querySelectorAll('.nota').forEach((x) => x.classList.toggle('elegida', x === b)); $('#enviar').disabled = false; };
     });
     $('#enviar').disabled = seleccion === null;
-    $('#enviar').onclick = () => enviarVoto(cid);
+    $('#enviar').onclick = () => enviarVoto(qid);
+  };
+  if (abierta && !yaVoto) {
+    // prioridad: quien esta en tarima
+    app.innerHTML = tarjetaVoto(p, cid, 'VOTACIÓN ABIERTA', enCuenta ? `<div class="cuenta-cierre">⏳ La votación se cierra en <b id="cuenta-n">${estado.quedan}</b> s · ¡envía tu nota ya!</div>` : '') + tarjetaRegistro();
+    activarVoto(cid);
+  } else if (objetivo && participantes[objetivo]) {
+    app.innerHTML = tarjetaVoto(participantes[objetivo], objetivo, 'CALIFICACIÓN PENDIENTE', '<p class="chico" style="margin:8px 0 0"><a href="#" id="volver">← Volver</a></p>') + tarjetaRegistro();
+    activarVoto(objetivo);
   } else if (abierta) {
     app.innerHTML = `<section class="tarjeta gracias"><div class="grande">🎉</div><h2>¡Gracias por calificar!</h2>
-      <p>Tu calificación para <b>${esc(p.nombre)}</b> quedó registrada: <b>${misVotos[cid]}</b>.</p></section>${tarjetaRegistro()}`;
+      <p>Tu calificación para <b>${esc(p.nombre)}</b> quedó registrada: <b>${misVotos[cid]}</b>.</p></section>${tarjetaPendientes(pend)}${tarjetaRegistro()}`;
   } else {
     app.innerHTML = `<section class="tarjeta espera"><div class="pulso"></div><h2>Atento al escenario</h2>
       <p class="suave">La votación se abre durante cada interpretación. Esta pantalla cambia sola: no necesitas recargarla.</p>
       ${p ? `<div class="en-escena"><img src="${foto(p, true)}" alt=""><div><div class="suave chico">EN ESCENA</div><b>${esc(p.nombre)}</b><div class="suave chico">${esc(p.categoria)}</div></div></div>` : ''}
-      </section>${tarjetaRegistro()}`;
+      </section>${tarjetaPendientes(pend)}${tarjetaRegistro()}`;
   }
+}
+// Participantes que ya cantaron y que esta boleta todavia no califica (votacion general abierta)
+function pendientes(excluir) {
+  if (estado.votacionGeneral !== true) return [];
+  return Object.keys(presentados).filter((id) => participantes[id] && misVotos[id] === undefined && id !== excluir)
+    .sort((a, b) => (participantes[a].catOrden - participantes[b].catOrden) || (participantes[a].orden - participantes[b].orden));
+}
+function tarjetaPendientes(pend) {
+  if (!pend.length) return '';
+  return `<section class="tarjeta pendientes"><h3 style="margin:0 0 4px">Te faltan por calificar (${pend.length})</h3>
+    <p class="suave chico" style="margin:0 0 10px">Si no alcanzaste a calificar a alguien, hazlo aquí antes de que se cierren las votaciones. Un voto por participante.</p>
+    ${pend.map((id) => { const q = participantes[id]; return `<button class="pend" data-pend="${id}"><img src="${foto(q, true)}" alt=""><span><b>${esc(q.nombre)}</b><br><span class="suave chico">${esc(q.categoria)}</span></span><span class="ir">Calificar ›</span></button>`; }).join('')}</section>`;
 }
 
 function otraBoleta() {
@@ -256,12 +290,16 @@ async function enviarVoto(cid) {
     await conReintentos(() => guardar(`votos/${cid}/${reg.num}`, { n, k: reg.k, t: TS }),
       { alReintentar: () => { const t = $('#txt-enviando'); if (t) t.innerHTML = '<b style="color:var(--oro)">Señal débil:</b> seguimos intentando. No cierres esta página.'; } });
     misVotos[cid] = n; local.set('bc_votos', misVotos);
+    if (objetivo === cid) objetivo = null;
+    seleccion = null;
     aviso('¡Calificación enviada!');
   } catch (e) {
     if (e.permiso) {
       let est = {}; try { est = (await leer('estado')) || {}; } catch (x) {}
-      if (est.votacion !== 'ABIERTA' || est.cantanteId !== cid) aviso('La votación para este cantante ya se cerró.', 'error', 5000);
-      else aviso('Tu boleta no está activa o ya calificaste a este cantante. Si cambiaste de boleta, usa «Registrar otra»; si no, acércate a la mesa de información.', 'error', 8000);
+      const enTarima = est.votacion === 'ABIERTA' && est.cantanteId === cid;
+      if (!enTarima && est.votacionGeneral !== true) aviso('Las votaciones del público ya se cerraron.', 'error', 5000);
+      else if (!enTarima && !presentados[cid]) aviso('La votación para este cantante ya se cerró.', 'error', 5000);
+      else { if (objetivo === cid) { misVotos[cid] = misVotos[cid] ?? '✓'; local.set('bc_votos', misVotos); objetivo = null; } aviso('Tu boleta no está activa o ya calificaste a este cantante. Si cambiaste de boleta, usa «Registrar otra»; si no, acércate a la mesa de información.', 'error', 8000); }
     } else aviso('Sin conexión: la calificación NO se envió. Intenta de nuevo.', 'error', 6000);
   }
   enviando = false; firma = ''; pintar();

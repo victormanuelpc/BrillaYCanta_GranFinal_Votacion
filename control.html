@@ -79,7 +79,7 @@ const app = $('#app');
 let U = null;
 let invitadas = {}, historial = {}, bitacoraDatos = {};
 let cfg = {}, estado = {}, part = {}, jur = {}, jurPriv = {}, jurSes = {}, boletas = {}, notas = {}, cierres = {}, pantalla = {}, registro = {}, validas = null;
-let votosActual = {}, offVotos = null, cidVotos = null;
+let votosTodos = {};   // todos los votos del publico (solo produccion los lee)
 let pestana = 'vivo', seleccionado = null;
 let busquedaBoleta = '';
 
@@ -89,7 +89,8 @@ const nBoletas = () => Object.keys(boletas).length;
 function resultadoDe(cid) {
   const esActual = cid === estado.cantanteId;
   const cierre = cierres[cid];
-  const agregado = esActual && (estado.votacion === 'ABIERTA' || !cierre) ? agregarVotos(votosActual) : null;
+  // siempre se usan los votos en vivo: incluyen las calificaciones pendientes que llegan despues
+  const agregado = votosTodos[cid] ? agregarVotos(votosTodos[cid]) : (esActual && estado.votacion === 'ABIERTA' ? { votos: 0, suma: 0 } : null);
   return calcularResultado({ agregado, notas: notas[cid], cierre, config: cfg, jurados: jur });
 }
 
@@ -148,6 +149,7 @@ function pVivo(estructura = false) {
   if (estructura || !$('#vivo')) {
     app.innerHTML = `<div id="vivo">
       <div class="tarjeta" id="vivo-barra"></div>
+      <div id="vivo-general"></div>
       <div class="dos-col"><div class="tarjeta"><h3>Participantes</h3><div class="lista-part" id="vivo-lista"></div></div>
         <div><div class="tarjeta" id="vivo-actual"></div>
           <div class="tarjeta"><h3>Vista previa de la pantalla</h3><div class="vista-previa" id="previa"><iframe src="pantalla.html" title="Vista previa" tabindex="-1"></iframe></div></div></div></div></div>`;
@@ -156,6 +158,8 @@ function pVivo(estructura = false) {
     app.onclick = manejarClicVivo;
   }
   $('#vivo-barra').innerHTML = barraPantalla();
+  const vg = $('#vivo-general'); const hg = tarjetaVotacionGeneral();
+  if (vg.dataset.h !== hg) { vg.innerHTML = hg; vg.dataset.h = hg; conectarBotonesGeneral(vg); }
   // lista
   let html = ''; let cat = '';
   for (const p of partLista()) {
@@ -270,6 +274,41 @@ async function cerrarVotacion() {
   const agg = agregarVotos(s.val());
   await fb.update(r('historial/' + cid), { cierre: ahora() });
   await fb.set(r('cierres/' + cid), { boletas: nBoletas(), votos: agg.votos, suma: agg.suma, t: ahora() });
+  // desde ahora queda en la lista de «calificaciones pendientes» de los celulares
+  await fb.update(r(''), { ['presentados/' + cid]: true, 'estado/presentadosV': ahora() });
+}
+// ---- votacion general: el publico puede calificar despues a quienes ya cantaron ----
+let confirmarCierreTotal = 0;
+async function cerrarTodasLasVotaciones() {
+  if (Date.now() - confirmarCierreTotal > 6000) { confirmarCierreTotal = Date.now(); aviso('Pulsa de nuevo en los próximos 6 segundos para cerrar TODAS las votaciones del público', 'error', 6000); return; }
+  confirmarCierreTotal = 0;
+  pararCuenta();
+  await fb.update(r(''), { 'estado/votacionGeneral': false, 'estado/votacion': 'CERRADA', 'estado/quedan': null, 'pantalla/vivo/quedan': null });
+  await new Promise((ok) => setTimeout(ok, 1500));   // deja llegar los ultimos votos en camino
+  const todos = (await fb.get(r('votos'))).val() || {};
+  const upd = {};
+  for (const [cid, vs] of Object.entries(todos)) { const a = agregarVotos(vs); upd['cierres/' + cid] = { boletas: nBoletas(), votos: a.votos, suma: a.suma, t: ahora(), final: true }; }
+  if (Object.keys(upd).length) await fb.update(r(''), upd);
+  bitacora('Cierre definitivo de las votaciones del público');
+  aviso('Todas las votaciones del público quedaron cerradas. Las notas del público ya son definitivas.');
+}
+async function reabrirVotacionGeneral() {
+  await fb.update(r('estado'), { votacionGeneral: true });
+  bitacora('Se reabrió la votación general del público');
+  aviso('Votación general reabierta: el público puede calificar a quienes ya cantaron');
+}
+function tarjetaVotacionGeneral() {
+  const abierta = estado.votacionGeneral === true;
+  return `<div class="tarjeta fila" style="border:2px solid ${abierta ? 'rgba(46,204,113,.6)' : 'rgba(217,75,80,.6)'}"><div class="crece">
+    <b>Votación general del público: ${abierta ? '<span style="color:var(--verde)">ABIERTA</span>' : '<span style="color:var(--rojo)">CERRADA</span>'}</b><br>
+    <span class="suave chico">${abierta ? 'Los asistentes pueden calificar a quienes ya cantaron (un voto por boleta y participante). Las notas del público son PARCIALES hasta que la cierres. Ciérrala antes de que el jurado delibere.' : 'Nadie puede votar más. Las notas del público son definitivas.'}</span></div>
+    ${abierta ? '<button class="boton rojo chico" data-general="cerrar">Cerrar todas las votaciones</button>' : '<button class="boton secundario chico" data-general="reabrir">Reabrir</button>'}</div>`;
+}
+function conectarBotonesGeneral(raiz) {
+  raiz.querySelectorAll('[data-general]').forEach((b) => (b.onclick = async () => {
+    try { if (b.dataset.general === 'cerrar') await cerrarTodasLasVotaciones(); else await reabrirVotacionGeneral(); pintar(); }
+    catch (e) { aviso('No se pudo: ' + (esPermiso(e) ? 'sin permiso' : 'sin conexión'), 'error'); }
+  }));
 }
 async function cambiarModoPantalla(modo) {
   if (modo === 'mensaje') return dialogoMensaje();
@@ -307,7 +346,7 @@ function dialogoMensaje() {
 // ---------------- datos que la pantalla necesita (solo lo ya revelado) ----------------
 function construirResultado(cid, rev, soloPublico) {
   const R = resultadoDe(cid);
-  if (soloPublico) return { cid, soloPublico: true, publico: { nota: R.promedio, votos: R.nVotos }, revelado: { publico: true } };
+  if (soloPublico) return { cid, soloPublico: true, parcial: estado.votacionGeneral === true, publico: { nota: R.promedio, votos: R.nVotos }, revelado: { publico: true } };
   return {
     cid,
     publico: rev.publico ? { nota: R.promedio, votos: R.nVotos } : null,
@@ -366,9 +405,10 @@ function siguientePodio() {
 }
 function pResultados() {
   const box = $('#res'); if (!box) return;
-  box.innerHTML = `<div class="tarjeta fila"><div class="crece"><b>Fórmula:</b> ${(cfg.pesoPublico ?? 30) === 20 ? 'el público es el 5.º jurado (J5 = promedio simple de sus votos) · Final = promedio de J1, J2, J3, J4 y J5 (20 % cada uno)' : `Final = ${cfg.pesoPublico ?? 30}% × Público + ${100 - (cfg.pesoPublico ?? 30)}% × Jurado · Público = promedio simple de los votos`} ·
+  box.innerHTML = tarjetaVotacionGeneral() + `<div class="tarjeta fila"><div class="crece"><b>Fórmula:</b> ${(cfg.pesoPublico ?? 30) === 20 ? 'el público es el 5.º jurado (J5 = promedio simple de sus votos) · Final = promedio de J1, J2, J3, J4 y J5 (20 % cada uno)' : `Final = ${cfg.pesoPublico ?? 30}% × Público + ${100 - (cfg.pesoPublico ?? 30)}% × Jurado · Público = promedio simple de los votos`} ·
     Desempate: mayor promedio de jurado · Premiación: 5 puestos; Pre-infantil 2 primeros, 2 segundos y 3 terceros.</div><button class="boton chico" id="informe">📄 Informe del evento y acta</button> <button class="boton secundario chico" id="csv">⬇ Exportar a Excel (CSV)</button></div>
     ${CATEGORIAS.map((c) => tablaCategoria(c).html).join('')}`;
+  conectarBotonesGeneral(box);
   $('#csv').onclick = exportarCSV;
   $('#informe').onclick = generarInforme;
   $$('[data-podio]').forEach((b) => (b.onclick = async () => {
@@ -638,7 +678,8 @@ function pAjustes() {
   $('#a-borrar-btn').onclick = async () => {
     if ($('#a-borrar').value !== 'BORRAR') return aviso('Escribe BORRAR para confirmar', 'error');
     await fb.update(r(''), { votos: null, notas: null, cierres: null, boletas: null, historial: null, bitacora: null });
-    await fb.set(r('estado'), { cantanteId: '', votacion: 'CERRADA', juradoAbierto: false, sesion: codigoNuevo(8) });
+    await fb.set(r('estado'), { cantanteId: '', votacion: 'CERRADA', juradoAbierto: false, sesion: codigoNuevo(8), votacionGeneral: true, presentadosV: 0 });
+    await fb.set(r('presentados'), null);
     await fb.set(r('pantalla'), { modo: 'espera' });
     aviso('Datos del ensayo borrados'); pAjustes();
   };
@@ -649,11 +690,7 @@ function pAjustes() {
 //  ARRANQUE
 // =====================================================================
 function escuchar(ruta, fn) { return fb.onValue(r(ruta), (s) => { fn(s.val()); pintar(); }, (e) => console.warn('lectura', ruta, e)); }
-function escucharVotosActual() {
-  if (cidVotos === estado.cantanteId) return;
-  if (offVotos) offVotos(); votosActual = {}; cidVotos = estado.cantanteId;
-  if (cidVotos) offVotos = escuchar('votos/' + cidVotos, (v) => (votosActual = v || {}));
-}
+function escucharVotosActual() {}
 function arrancarPanel() {
   $('#pestanas').classList.remove('oculto');
   $$('#pestanas button').forEach((b) => (b.onclick = () => cambiarPestana(b.dataset.t)));
@@ -664,6 +701,7 @@ function arrancarPanel() {
     if (!cuentaTimer && estado.quedan != null) fb.update(r(''), { 'estado/quedan': null, 'pantalla/vivo/quedan': null }).catch(() => {});
   });
   escuchar('participantes', (v) => (part = conIds(v)));
+  escuchar('votos', (v) => (votosTodos = v || {}));
   escuchar('jurados', (v) => (jur = v || {}));
   escuchar('invitadas', (v) => (invitadas = v || {}));
   escuchar('historial', (v) => (historial = v || {}));
