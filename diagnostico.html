@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Diagnóstico · Brilla & Canta</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  .prueba { display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start; padding: 12px; border-radius: 12px; background: rgba(0,0,0,.22); margin-bottom: 8px; }
+  .prueba .ic { font-size: 1.4rem; line-height: 1.2; }
+  .prueba .t { font-weight: 700; }
+  .prueba .d { font-size: .88rem; color: var(--texto-suave); }
+  .prueba.mal { outline: 2px solid rgba(255,90,95,.6); }
+  .prueba.bien { outline: 2px solid rgba(47,209,128,.35); }
+</style>
+</head>
+<body>
+<main class="contenedor">
+  <div class="tarjeta"><h2>Diagnóstico de la instalación</h2>
+    <p class="suave">Abre esta página después de configurar Firebase y subir los archivos a GitHub. Si todo sale en verde, el sistema está listo para el ensayo. Si algo sale en rojo, toma una captura y envíala.</p>
+    <div id="lista"></div>
+    <p class="suave chico" id="nota" style="margin-top:12px"></p>
+  </div>
+</main>
+<script type="module">
+import { CONFIG_FIREBASE } from './js/config.js';
+const lista = document.getElementById('lista');
+function fila(titulo) {
+  const d = document.createElement('div'); d.className = 'prueba'; d.innerHTML = `<span class="ic">⏳</span><div><div class="t">${titulo}</div><div class="d">Revisando…</div></div>`;
+  lista.appendChild(d);
+  return (ok, texto) => { d.classList.add(ok ? 'bien' : 'mal'); d.querySelector('.ic').textContent = ok ? '✅' : '❌'; d.querySelector('.d').innerHTML = texto; return ok; };
+}
+const BASE = String(CONFIG_FIREBASE.databaseURL || '').replace(/\/+$/, '');
+async function rest(metodo, ruta, cuerpo) {
+  const r = await fetch(`${BASE}/${ruta}.json`, { method: metodo, cache: 'no-store', body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo) });
+  let datos = null; try { datos = await r.json(); } catch (e) {}
+  return { estado: r.status, datos };
+}
+
+(async () => {
+  // 1. configuracion
+  const f1 = fila('1. Configuración (js/config.js)');
+  const vacios = Object.entries(CONFIG_FIREBASE).filter(([, v]) => !v || String(v).includes('PEGA_AQUI')).map(([k]) => k);
+  if (!f1(!vacios.length, vacios.length ? `Faltan datos en js/config.js: <b>${vacios.join(', ')}</b>. Cópialos de la consola de Firebase (Configuración del proyecto → Tus apps → Web).` : 'Completa.')) return;
+
+  // 2. lectura publica por REST + datos importados
+  const f2 = fila('2. Base de datos y finalistas cargados');
+  let r;
+  try { r = await rest('GET', 'participantes'); } catch (e) { return f2(false, `No se pudo conectar con <b>${BASE}</b>. Revisa que <code>databaseURL</code> esté copiada exacta y que la Realtime Database esté creada.`); }
+  const n = r.datos ? Object.keys(r.datos).length : 0;
+  if (r.estado === 401 || r.estado === 403) f2(false, 'La base de datos responde, pero las reglas no permiten leer. Pega y <b>publica</b> el archivo database.rules.json en la pestaña Reglas.');
+  else f2(n === 53, n ? `${n} finalistas cargados${n === 53 ? '.' : ' (se esperaban 53).'}` : 'La base está vacía: en la pestaña <b>Datos</b>, menú ⋮ → <b>Importar JSON</b> → datos-iniciales.json.');
+
+  // 3. reglas de seguridad publicadas
+  const f3 = fila('3. Reglas de seguridad');
+  r = await rest('GET', 'secretos');
+  f3(r.estado === 401 || r.estado === 403, r.estado === 401 || r.estado === 403 ? 'Publicadas: los datos privados están protegidos.' : '<b>¡Peligro!</b> Cualquiera puede leer los códigos secretos. Pega y publica database.rules.json en la pestaña Reglas.');
+
+  // 4. escritura del publico (boleta de prueba 000)
+  const f4 = fila('4. Registro del público (boleta de prueba 000)');
+  const k = 'diagnostico' + Math.random().toString(36).slice(2, 12);
+  r = await rest('PUT', 'boletas/000', { nombre: 'Prueba diagnóstico', finalista: 'NINGUNO', k, d: 'diagnostico-0000', t: { '.sv': 'timestamp' } });
+  if (r.estado === 200) f4(true, 'Funciona. Se creó la boleta de prueba <b>000</b>: bórrala luego en Control → Boletas → Liberar (o con «Borrar datos del ensayo»).');
+  else f4(false, `Respuesta ${r.estado}. Si la boleta 000 ya existía de un diagnóstico anterior, libérala en Control → Boletas y vuelve a abrir esta página. Si cargaste un rango de boletas válidas que no incluye 000, quita la restricción para esta prueba. Si no, revisa que el registro esté abierto (Control → Boletas) y que las reglas estén publicadas.`);
+
+  // 5. cuentas anonimas (produccion y jurados)
+  const f5 = fila('5. Acceso de producción y jurados (cuentas anónimas)');
+  let fb;
+  try {
+    fb = await import('./js/comun.js');
+    const u = await Promise.race([fb.sesion(), new Promise((_, no) => setTimeout(() => no(new Error('tiempo agotado')), 15000))]);
+    f5(!!u, 'Habilitado.');
+  } catch (e) {
+    f5(false, `No se pudo iniciar sesión anónima (${String(e.code || e.message)}). En Firebase: <b>Authentication → Método de acceso → Anónimo → Habilitar</b>, y en Configuración agrega el dominio <code>${location.hostname}</code> a Dominios autorizados.`);
+  }
+
+  // 6. conexion en vivo
+  const f6 = fila('6. Conexión en vivo (control, pantalla y jurados)');
+  if (fb) {
+    let listo = false;
+    fb.fb.onValue(fb.r('.info/connected'), (s) => { if (s.val() === true && !listo) { listo = true; f6(true, 'Conectada.'); } });
+    setTimeout(() => { if (!listo) f6(false, 'No conectó en 15 segundos. Revisa la conexión a internet y la dirección databaseURL.'); }, 15000);
+  } else f6(false, 'Depende del punto 5.');
+  document.getElementById('nota').textContent = 'Proyecto: ' + (CONFIG_FIREBASE.projectId || '—') + ' · Base: ' + BASE;
+})();
+</script>
+</body>
+</html>

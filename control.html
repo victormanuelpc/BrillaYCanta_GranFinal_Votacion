@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#12051d">
+<meta name="robots" content="noindex">
+<title>Control de producción · Brilla & Canta</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  .pestanas { display: flex; gap: 6px; overflow-x: auto; padding: 10px 16px 0; position: sticky; top: 69px; z-index: 15; background: rgba(18,5,29,.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--panel-borde); }
+  .pestanas button { background: none; border: 0; color: var(--texto-suave); font: 700 .95rem var(--display); padding: 10px 14px; border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+  .pestanas button.activa { color: var(--oro); border-bottom-color: var(--oro); }
+  .barra-pantalla { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .barra-pantalla .boton.activo { outline: 3px solid var(--oro); outline-offset: 2px; }
+  .dos-col { display: grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .dos-col { grid-template-columns: 1fr; } }
+  .lista-part { max-height: calc(100vh - 230px); overflow: auto; padding-right: 4px; }
+  .cat-titulo { font: 800 .8rem var(--display); letter-spacing: .08em; color: var(--oro); margin: 12px 4px 6px; text-transform: uppercase; }
+  .part { display: flex; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 12px; cursor: pointer; border: 1px solid transparent; }
+  .part:hover { background: rgba(255,255,255,.05); }
+  .part.sel { border-color: rgba(245,196,81,.6); background: rgba(245,196,81,.08); }
+  .part img { width: 38px; height: 47px; object-fit: cover; border-radius: 8px; }
+  .part .n { flex: 1; min-width: 0; font-weight: 600; font-size: .93rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .actual-cab { display: flex; gap: 16px; align-items: center; }
+  .actual-cab img { width: 110px; border-radius: 14px; }
+  .actual-cab h2 { font-size: 1.6rem; margin: 4px 0; }
+  .pasos { display: grid; gap: 10px; margin-top: 16px; }
+  .paso { display: grid; grid-template-columns: 30px 1fr auto; gap: 12px; align-items: center; background: rgba(0,0,0,.22); border-radius: 14px; padding: 12px 14px; }
+  .paso .num { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.1); font-weight: 800; }
+  .paso.hecho .num { background: var(--verde); color: #06210f; }
+  .paso .t { font-weight: 700; } .paso .d { font-size: .85rem; color: var(--texto-suave); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-top: 14px; }
+  .kpi { background: rgba(0,0,0,.22); border-radius: 14px; padding: 12px; }
+  .kpi b { display: block; font: 800 1.6rem var(--display); color: var(--oro); font-variant-numeric: tabular-nums; }
+  .kpi span { font-size: .78rem; color: var(--texto-suave); }
+  .jur { display: flex; gap: 8px; flex-wrap: wrap; }
+  table.tabla { width: 100%; border-collapse: collapse; font-size: .9rem; }
+  .tabla th { text-align: left; font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--texto-suave); padding: 8px 6px; border-bottom: 1px solid var(--panel-borde); position: sticky; top: 0; background: #1a0829; }
+  .tabla td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: middle; }
+  .tabla td.n, .tabla th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .tabla tr.top td:first-child { color: var(--oro); font-weight: 800; }
+  .envoltura-tabla { overflow: auto; max-height: 70vh; }
+  .vista-previa { position: relative; width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; border: 1px solid var(--panel-borde); background: #000; }
+  .vista-previa iframe { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.7); display: grid; place-items: center; z-index: 60; padding: 16px; }
+  .modal .tarjeta { max-width: 460px; width: 100%; background: #1d0a2e; }
+  .qr-blanco { background: #fff; border-radius: 14px; padding: 12px; }
+  .qr-blanco svg { width: 100%; height: auto; display: block; }
+  .verif { font: 800 1.2rem var(--display); padding: 16px; border-radius: 14px; margin-top: 12px; }
+  .verif.si { background: rgba(47,209,128,.15); color: var(--verde); }
+  .verif.no { background: rgba(255,90,95,.15); color: #ffb3b5; }
+  input.gigante { font: 800 2.4rem var(--display); text-align: center; letter-spacing: .2em; }
+</style>
+</head>
+<body>
+<div id="cab"></div>
+<nav class="pestanas oculto" id="pestanas">
+  <button data-t="vivo" class="activa">🎤 En vivo</button>
+  <button data-t="resultados">🏆 Resultados</button>
+  <button data-t="boletas">🎫 Boletas</button>
+  <button data-t="ajustes">⚙️ Ajustes</button>
+</nav>
+<main class="contenedor ancho" id="app"><div class="cargando"><div><div class="giro"></div>Conectando…</div></div></main>
+
+<script type="module">
+import { fb, r, sesion, $, $$, esc, num, pct, aviso, esPermiso, foto, pad3, ahora, htmlEncabezado, vigilarConexion,
+  calcularResultado, agregarVotos, compararResultados, ordenarParticipantes, CATEGORIAS, URL_BASE, conIds, puestoDe, premiadosDe } from './js/comun.js';
+import { qrSVG } from './js/qr.js';
+
+$('#cab').innerHTML = htmlEncabezado();
+vigilarConexion($('#conexion'));
+const app = $('#app');
+
+// ---------------- estado local ----------------
+let U = null;
+let invitadas = {}, historial = {}, bitacoraDatos = {};
+let cfg = {}, estado = {}, part = {}, jur = {}, jurPriv = {}, jurSes = {}, boletas = {}, notas = {}, cierres = {}, pantalla = {}, registro = {}, validas = null;
+let votosActual = {}, offVotos = null, cidVotos = null;
+let pestana = 'vivo', seleccionado = null;
+let busquedaBoleta = '';
+
+const partLista = () => ordenarParticipantes(part);
+const nBoletas = () => Object.keys(boletas).length;
+
+function resultadoDe(cid) {
+  const esActual = cid === estado.cantanteId;
+  const cierre = cierres[cid];
+  const agregado = esActual && (estado.votacion === 'ABIERTA' || !cierre) ? agregarVotos(votosActual) : null;
+  return calcularResultado({ agregado, notas: notas[cid], cierre, config: cfg, jurados: jur });
+}
+
+// ---------------- acceso ----------------
+function pintarLogin(msg = '') {
+  app.innerHTML = `<form class="tarjeta" id="f-login" style="max-width:420px;margin:40px auto">
+    <h2>Control de producción</h2><p class="suave">Ingresa el código de administrador.</p>
+    <div class="campo"><input id="codigo" type="password" autocomplete="current-password" placeholder="Código"></div>
+    <button class="boton bloque">Entrar</button>
+    ${msg ? `<p style="color:#ffb3b5">${esc(msg)}</p>` : ''}</form>`;
+  $('#codigo').focus();
+  $('#f-login').onsubmit = async (e) => {
+    e.preventDefault();
+    try { await fb.set(r('admins/' + U.uid), { codigo: $('#codigo').value.trim(), t: ahora() }); arrancarPanel(); }
+    catch (err) { pintarLogin(esPermiso(err) ? 'Código incorrecto.' : 'Sin conexión.'); }
+  };
+}
+
+// ---------------- repintado con anti-rebote ----------------
+let pendiente = false;
+function pintar() { if (pendiente) return; pendiente = true; setTimeout(() => { pendiente = false; pintarPestana(); sincronizarPantalla(); }, 30); }
+function pintarPestana() {
+  if (pestana === 'vivo') pVivo();
+  else if (pestana === 'resultados') pResultados();
+  else if (pestana === 'boletas') pBoletasTabla();
+}
+function cambiarPestana(t) {
+  pestana = t; $$('#pestanas button').forEach((b) => b.classList.toggle('activa', b.dataset.t === t));
+  if (t === 'vivo') { app.innerHTML = ''; pVivo(true); }
+  if (t === 'resultados') { app.innerHTML = '<div id="res"></div>'; pResultados(); }
+  if (t === 'boletas') pBoletas();
+  if (t === 'ajustes') pAjustes();
+}
+
+// =====================================================================
+//  EN VIVO
+// =====================================================================
+function estadoChip(p) {
+  const c = cierres[p.id];
+  if (p.ausente && !c && p.id !== estado.cantanteId) return '<span class="chip rojo">No asiste</span>';
+  if (p.id === estado.cantanteId) return estado.votacion === 'ABIERTA' ? '<span class="chip verde">● Votando</span>' : '<span class="chip oro">En escena</span>';
+  if (c) { const R = resultadoDe(p.id); return `<span class="chip ${R.completo ? 'azul' : ''}">${R.final === null ? '—' : num(R.final, 2)}</span>`; }
+  return '';
+}
+function barraPantalla() {
+  const m = pantalla.modo || 'espera';
+  const b = (modo, txt, extra = '') => `<button class="boton secundario chico ${m === modo ? 'activo' : ''}" data-pant="${modo}" ${extra}>${txt}</button>`;
+  return `<div class="barra-pantalla"><b style="margin-right:4px">Pantalla:</b>
+    ${b('espera', '🏠 Espera / QR')}${b('escena', '🎤 En escena', estado.cantanteId ? '' : 'disabled')}
+    ${b('resultado', '🏅 Resultado', estado.cantanteId ? '' : 'disabled')}
+    ${b('jurados', '⚖️ Jurados')}${m === 'jurados' ? `<button class="boton naranja chico" data-accion="sigJurado">Presentar siguiente jurado ▶</button>` : ''}
+    ${b('invitada', '⭐ Artista invitada…')}
+    ${b('podio', '🏆 Podio', 'disabled title="Se lanza desde la pestaña Resultados"')}${b('mensaje', '💬 Mensaje…')}</div>`;
+}
+function pVivo(estructura = false) {
+  if (estructura || !$('#vivo')) {
+    app.innerHTML = `<div id="vivo">
+      <div class="tarjeta" id="vivo-barra"></div>
+      <div class="dos-col"><div class="tarjeta"><h3>Participantes</h3><div class="lista-part" id="vivo-lista"></div></div>
+        <div><div class="tarjeta" id="vivo-actual"></div>
+          <div class="tarjeta"><h3>Vista previa de la pantalla</h3><div class="vista-previa" id="previa"><iframe src="pantalla.html" title="Vista previa" tabindex="-1"></iframe></div></div></div></div></div>`;
+    const ajustarPrevia = () => { const w = $('#previa')?.clientWidth; if (w) $('#previa iframe').style.transform = `scale(${w / 1920})`; };
+    new ResizeObserver(ajustarPrevia).observe($('#previa')); ajustarPrevia();
+    app.onclick = manejarClicVivo;
+  }
+  $('#vivo-barra').innerHTML = barraPantalla();
+  // lista
+  let html = ''; let cat = '';
+  for (const p of partLista()) {
+    if (p.categoria !== cat) { cat = p.categoria; html += `<div class="cat-titulo">${esc(cat)}</div>`; }
+    html += `<div class="part ${seleccionado === p.id ? 'sel' : ''}" data-sel="${p.id}"><img src="${foto(p, true)}" alt="" loading="lazy">
+      <div class="n">${esc(p.nombre)}</div>${estadoChip(p)}</div>`;
+  }
+  const lista = $('#vivo-lista'); const scroll = lista.scrollTop; lista.innerHTML = html; lista.scrollTop = scroll;
+  // panel del participante
+  const cid = seleccionado || estado.cantanteId;
+  const p = part[cid];
+  if (!p) { $('#vivo-actual').innerHTML = '<h3>Selecciona un participante de la lista</h3><p class="suave">Luego pulsa «Poner en escena».</p>'; return; }
+  const esActual = cid === estado.cantanteId;
+  const R = resultadoDe(cid);
+  const abierta = esActual && estado.votacion === 'ABIERTA';
+  const idsJ = Object.keys(jur).sort();
+  const rev = pantalla.cid === cid ? (pantalla.revelado || {}) : {};
+  const enResultado = pantalla.modo === 'resultado' && pantalla.cid === cid;
+  $('#vivo-actual').innerHTML = `
+    <div class="actual-cab"><img src="${foto(p)}" alt=""><div>
+      <div>${esActual ? '<span class="chip oro">EN ESCENA</span>' : '<span class="chip">Seleccionado</span>'} <span class="chip">${esc(p.categoria)}</span></div>
+      <h2>${esc(p.nombre)}</h2><div class="suave">${p.cancion ? '«' + esc(p.cancion) + '»' : 'Sin canción registrada'}${p.ciudad ? ' · ' + esc(p.ciudad) : ''}</div></div></div>
+    <div class="pasos">
+      <div class="paso ${esActual ? 'hecho' : ''}"><span class="num">1</span><div><div class="t">Poner en escena</div><div class="d">Aparece en la pantalla y los jurados pueden calificar.</div></div>
+        <button class="boton chico" data-accion="escena" ${esActual ? 'disabled' : ''}>${esActual ? 'En escena' : 'Poner en escena'}</button></div>
+      <div class="paso ${abierta || cierres[cid] ? 'hecho' : ''}"><span class="num">2</span><div><div class="t">Votación del público</div><div class="d">${abierta ? 'ABIERTA — el público está calificando.' : cierres[cid] ? `Cerrada con ${R.nVotos} votos.` : 'Ábrela durante la interpretación.'}</div></div>
+        ${abierta ? (estado.quedan != null
+            ? `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><span class="chip rojo">⏳ Se cierra en ${estado.quedan} s</span><span><button class="boton rojo chico" data-accion="cerrarYa">Cerrar ya</button> <button class="boton secundario chico" data-accion="cancelarCuenta">Cancelar</button></span></div>`
+            : `<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end"><button class="boton rojo chico" data-accion="cerrar">⏳ Cerrar en ${segCuenta()} s</button><button class="boton secundario chico" data-accion="cerrarYa">Cerrar ya</button></div>`)
+          : `<button class="boton verde chico" data-accion="abrir" ${esActual ? '' : 'disabled'}>${cierres[cid] ? 'Reabrir' : 'Abrir votación'}</button>`}</div>
+      <div class="paso ${R.juradosRecibidos === R.nJurados && R.nJurados ? 'hecho' : ''}"><span class="num">3</span><div><div class="t">Jurado (${R.juradosRecibidos}/${R.nJurados})</div>
+        <div class="jur" style="margin-top:6px">${idsJ.map((j) => `<span class="chip ${R.notasJ[j] !== null ? 'verde' : ''}">${esc(jur[j].nombre)}: ${R.notasJ[j] !== null ? num(R.notasJ[j], 1) : '…'}</span>`).join('')}</div></div>
+        ${esActual ? (estado.juradoAbierto ? '<button class="boton secundario chico" data-accion="cerrarJurado">Cerrar jurado</button>' : '<button class="boton secundario chico" data-accion="abrirJurado">Reabrir jurado</button>') : '<span></span>'}</div>
+      <div class="paso ${enResultado ? 'hecho' : ''}"><span class="num">4</span><div><div class="t">Resultado en pantalla</div>
+        <div class="d">${enResultado && pantalla.soloPublico ? 'En pantalla: nota del público. Los jurados se revelan en el podio.' : enResultado ? 'Revela en el orden que quieras:' : 'Muestra la nota del público (los jurados se revelan en el podio).'}</div>
+        ${!enResultado ? `<button class="boton secundario chico" data-accion="resultado" style="margin-top:6px" ${esActual || cierres[cid] ? '' : 'disabled'}>Revelación completa (público + jurados)</button>` : ''}
+        ${enResultado && !pantalla.soloPublico ? `<div class="jur" style="margin-top:8px">
+          <button class="boton chico ${rev.publico ? 'secundario' : ''}" data-rev="publico">${rev.publico ? '✓ ' : ''}Público</button>
+          ${idsJ.map((j) => `<button class="boton chico ${rev[j] ? 'secundario' : ''}" data-rev="${j}" ${R.notasJ[j] === null ? 'disabled' : ''}>${rev[j] ? '✓ ' : ''}${esc(jur[j].nombre)}</button>`).join('')}
+          <button class="boton naranja chico" data-rev="final" ${rev.final ? 'disabled' : ''}>${rev.final ? '✓ ' : ''}Nota final</button>
+          <button class="boton secundario chico" data-rev="todo">Revelar todo</button></div>` : ''}</div>
+        <button class="boton chico" data-accion="resultadoPublico" ${esActual || cierres[cid] ? '' : 'disabled'}>${enResultado ? 'En pantalla' : 'Mostrar nota del público'}</button></div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><b>${R.nVotos}</b><span>votos del público (de ${nBoletas()} registrados)</span></div>
+      <div class="kpi"><b>${num(R.promedio, 2)}</b><span>promedio público (pesa ${R.pesoPublico}%)</span></div>
+      <div class="kpi"><b>${num(R.promJurado, 2)}</b><span>promedio jurado (pesa ${100 - R.pesoPublico}%)</span></div>
+      <div class="kpi" style="outline:2px solid rgba(245,196,81,.5)"><b>${num(R.final, 2)}</b><span>nota final ${R.completo ? '' : '(parcial)'}</span></div>
+    </div>`;
+}
+async function manejarClicVivo(e) {
+  const t = e.target.closest('[data-sel],[data-accion],[data-rev],[data-pant]'); if (!t) return;
+  try {
+    if (t.dataset.sel) { seleccionado = t.dataset.sel; pVivo(); return; }
+    if (t.dataset.pant) return cambiarModoPantalla(t.dataset.pant);
+    const cid = seleccionado || estado.cantanteId;
+    const a = t.dataset.accion;
+    if (a === 'escena') await ponerEnEscena(cid);
+    if (a === 'abrir') { await fb.update(r('estado'), { votacion: 'ABIERTA' }); await fb.update(r('pantalla'), { modo: 'escena', cid: estado.cantanteId }); await fb.update(r('historial/' + estado.cantanteId), { abierta: ahora() }); aviso('Votación del público ABIERTA'); }
+    if (a === 'cerrar') iniciarCuenta();
+    if (a === 'cerrarYa') { await cerrarVotacion(); aviso('Votación cerrada'); }
+    if (a === 'cancelarCuenta') { pararCuenta(); await fb.update(r(''), { 'estado/quedan': null, 'pantalla/vivo/quedan': null }); aviso('Cuenta regresiva cancelada: la votación sigue abierta'); }
+    if (a === 'cerrarJurado') await fb.update(r('estado'), { juradoAbierto: false });
+    if (a === 'abrirJurado') await fb.update(r('estado'), { juradoAbierto: true });
+    if (a === 'resultado') await mostrarResultado(cid, false);
+    if (a === 'resultadoPublico') await mostrarResultado(cid, true);
+    if (a === 'sigJurado') {
+      const n = Math.min(Object.keys(jur).length, Number((pantalla.jurados || {}).visibles || 0) + 1);
+      await fb.update(r('pantalla/jurados'), { visibles: n });
+      const j = Object.entries(jur).find(([, x]) => Number(x.orden) === n); if (j) bitacora('Presentación del jurado: ' + j[1].nombre);
+    }
+    if (t.dataset.rev) {
+      const k = t.dataset.rev;
+      if (k === 'todo') { const o = { publico: true, final: true }; Object.keys(jur).forEach((j) => (o[j] = true)); await fb.update(r('pantalla/revelado'), o); }
+      else await fb.update(r('pantalla/revelado'), { [k]: true });
+      sincronizarPantalla(0);
+    }
+  } catch (err) { aviso('No se pudo: ' + (esPermiso(err) ? 'sin permiso' : 'sin conexión'), 'error'); }
+}
+async function ponerEnEscena(cid) {
+  if (estado.votacion === 'ABIERTA' && estado.cantanteId && estado.cantanteId !== cid) await cerrarVotacion();
+  await fb.update(r('estado'), { cantanteId: cid, votacion: 'CERRADA', juradoAbierto: true, t: ahora() });
+  await fb.update(r('pantalla'), { modo: 'escena', cid, revelado: null });
+  await fb.update(r('historial/' + cid), { escena: ahora() });
+  bitacora(`En escena: ${part[cid].nombreCompleto || part[cid].nombre} (${part[cid].categoria})`);
+  seleccionado = cid;
+  aviso('En escena: ' + part[cid].nombre);
+}
+// ---- cuenta regresiva: avisa al publico (pantalla y celulares) antes de cerrar ----
+let cuentaTimer = null;
+const segCuenta = () => Math.max(3, Math.min(60, Number(cfg.cuentaSeg) || 15));
+function pararCuenta() { clearInterval(cuentaTimer); cuentaTimer = null; }
+function iniciarCuenta() {
+  if (cuentaTimer) return;
+  const cid = estado.cantanteId; let n = segCuenta();
+  fb.update(r(''), { 'estado/quedan': n, 'pantalla/vivo/quedan': n });
+  bitacora(`Cuenta regresiva de ${n} s para cerrar la votación`);
+  cuentaTimer = setInterval(async () => {
+    n -= 1;
+    if (estado.cantanteId !== cid || estado.votacion !== 'ABIERTA') { pararCuenta(); return; }
+    if (n > 0) { fb.update(r(''), { 'estado/quedan': n, 'pantalla/vivo/quedan': n }).catch(() => {}); return; }
+    pararCuenta();
+    try { await cerrarVotacion(); aviso('Votación cerrada'); } catch (e) { aviso('No se pudo cerrar: revisa la conexión', 'error'); }
+  }, 1000);
+}
+async function cerrarVotacion() {
+  const cid = estado.cantanteId; if (!cid) return;
+  pararCuenta();
+  await fb.update(r(''), { 'estado/votacion': 'CERRADA', 'estado/quedan': null, 'pantalla/vivo/quedan': null });
+  await new Promise((ok) => setTimeout(ok, 1500));    // deja llegar los ultimos votos en camino
+  const s = await fb.get(r('votos/' + cid));          // lectura definitiva despues de cerrar
+  const agg = agregarVotos(s.val());
+  await fb.update(r('historial/' + cid), { cierre: ahora() });
+  await fb.set(r('cierres/' + cid), { boletas: nBoletas(), votos: agg.votos, suma: agg.suma, t: ahora() });
+}
+async function cambiarModoPantalla(modo) {
+  if (modo === 'mensaje') return dialogoMensaje();
+  if (modo === 'resultado') return mostrarResultado(pantalla.cid && cierres[pantalla.cid] ? pantalla.cid : estado.cantanteId, pantalla.soloPublico !== false);
+  if (modo === 'jurados') { bitacora('Presentación de los jurados'); return fb.update(r('pantalla'), { modo, jurados: { visibles: 0 } }); }
+  if (modo === 'invitada') return dialogoInvitada();
+  if (modo === 'escena') return fb.update(r('pantalla'), { modo, cid: estado.cantanteId });
+  return fb.update(r('pantalla'), { modo });
+}
+function bitacora(texto) { return fb.push(r('bitacora'), { texto, t: ahora() }).catch(() => {}); }
+function dialogoInvitada() {
+  const lista = Object.entries(invitadas).sort((a, b) => (a[1].orden || 0) - (b[1].orden || 0));
+  const d = document.createElement('div'); d.className = 'modal';
+  d.innerHTML = `<div class="tarjeta"><h2>Artista invitada</h2><div class="rejilla">${lista.map(([id, x]) => `<button class="boton" data-inv="${id}">⭐ ${esc(x.nombre)}</button>`).join('')}</div>
+    <button class="boton secundario bloque" id="inv-c" style="margin-top:12px">Cancelar</button></div>`;
+  document.body.appendChild(d);
+  d.querySelector('#inv-c').onclick = () => d.remove();
+  d.querySelectorAll('[data-inv]').forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.inv; await fb.update(r('pantalla'), { modo: 'invitada', invitada: { id, nombre: invitadas[id].nombre } });
+    bitacora('Artista invitada: ' + invitadas[id].nombre); d.remove();
+  }));
+}
+function dialogoMensaje() {
+  const m = pantalla.mensaje || {};
+  const d = document.createElement('div'); d.className = 'modal';
+  d.innerHTML = `<form class="tarjeta"><h2>Mensaje en pantalla</h2>
+    <div class="campo"><label>Título</label><input id="m-t" maxlength="60" value="${esc(m.titulo || '')}" placeholder="Ej. ¡Intermedio!"></div>
+    <div class="campo"><label>Texto</label><textarea id="m-x" rows="3" maxlength="200" placeholder="Ej. Volvemos en 10 minutos">${esc(m.texto || '')}</textarea></div>
+    <div class="fila"><button class="boton">Mostrar</button><button type="button" class="boton secundario" id="m-c">Cancelar</button></div></form>`;
+  document.body.appendChild(d);
+  d.querySelector('#m-c').onclick = () => d.remove();
+  d.querySelector('form').onsubmit = async (e) => { e.preventDefault(); await fb.update(r('pantalla'), { modo: 'mensaje', mensaje: { titulo: $('#m-t').value, texto: $('#m-x').value } }); bitacora('Mensaje en pantalla: ' + $('#m-t').value); d.remove(); };
+}
+
+// ---------------- datos que la pantalla necesita (solo lo ya revelado) ----------------
+function construirResultado(cid, rev, soloPublico) {
+  const R = resultadoDe(cid);
+  if (soloPublico) return { cid, soloPublico: true, publico: { nota: R.promedio, votos: R.nVotos }, revelado: { publico: true } };
+  return {
+    cid,
+    publico: rev.publico ? { nota: R.promedio, votos: R.nVotos } : null,
+    jurados: Object.keys(jur).sort().map((j) => ({ id: j, nombre: jur[j].nombre || j, nota: rev[j] && R.notasJ[j] !== null ? R.notasJ[j] : null })),
+    final: rev.final ? R.final : null,
+    revelado: rev,
+  };
+}
+async function mostrarResultado(cid, soloPublico = true) {
+  if (!cid || !part[cid]) return;
+  ultimaSync = '';
+  await fb.update(r('pantalla'), { modo: 'resultado', cid, soloPublico, revelado: soloPublico ? { publico: true } : null, resultado: construirResultado(cid, soloPublico ? { publico: true } : {}, soloPublico) });
+}
+let ultimaSync = '', syncTimer = null;
+function sincronizarPantalla(espera = 700) {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    const cid = pantalla.cid || estado.cantanteId;
+    const act = estado.cantanteId;
+    const Ra = act ? resultadoDe(act) : null;
+    const vivo = { boletas: nBoletas(), votos: Ra ? Ra.nVotos : 0, abierta: estado.votacion === 'ABIERTA', quedan: estado.votacion === 'ABIERTA' && estado.quedan != null ? estado.quedan : null };
+    const upd = { vivo };
+    if (pantalla.modo === 'resultado' && cid && part[cid]) {
+      upd.resultado = construirResultado(cid, pantalla.revelado || {}, !!pantalla.soloPublico);
+    }
+    const firma = JSON.stringify(upd);
+    if (firma === ultimaSync) return;
+    ultimaSync = firma;
+    try { await fb.update(r('pantalla'), upd); } catch (e) { ultimaSync = ''; console.warn('pantalla', e); }
+  }, espera);
+}
+
+// =====================================================================
+//  RESULTADOS
+// =====================================================================
+function tablaCategoria(cat) {
+  const lista = partLista().filter((p) => p.categoria === cat).map((p) => ({ p, ...resultadoDe(p.id) }));
+  const calificados = lista.filter((x) => cierres[x.p.id] || x.juradosRecibidos).sort(compararResultados);
+  const sin = lista.filter((x) => !(cierres[x.p.id] || x.juradosRecibidos));
+  const idsJ = Object.keys(jur).sort();
+  const fila = (x, i) => { const pu = puestoDe(cat, i); return `<tr class="${pu ? 'top' : ''}"><td>${i === null ? '' : pu ? `<b>${pu}.º</b>` : i + 1}</td><td>${esc(x.p.nombre)}</td>
+    <td class="n">${x.nVotos}</td><td class="n">${num(x.promedio, 2)}</td>
+    ${idsJ.map((j) => `<td class="n">${x.notasJ[j] !== null ? num(x.notasJ[j], 1) : '—'}</td>`).join('')}
+    <td class="n">${num(x.promJurado, 2)}</td><td class="n"><b>${num(x.final, 2)}</b></td><td>${x.completo ? '<span class="chip verde">OK</span>' : '<span class="chip">parcial</span>'}</td></tr>`; };
+  return { calificados, html: `<div class="tarjeta"><div class="fila"><h2 class="crece" style="margin:0">${esc(cat)}</h2>
+      <button class="boton chico" data-podio="${esc(cat)}" ${calificados.length ? '' : 'disabled'}>Mostrar podio en pantalla</button>
+      ${pantalla.modo === 'podio' && pantalla.podio?.categoria === cat ? `<button class="boton naranja chico" data-podio-rev="1" ${siguientePodio() ? '' : 'disabled'}>${siguientePodio() ? `Revelar ${siguientePodio().puesto}.º puesto · ${esc(siguientePodio().nombre)}` : 'Todos revelados'}</button>` : ''}</div>
+    <div class="envoltura-tabla" style="margin-top:10px"><table class="tabla"><tr><th>Puesto</th><th>Participante</th><th class="n">Votos</th><th class="n">Público (J5)</th>
+      ${idsJ.map((j) => `<th class="n">${esc(jur[j].nombre)}</th>`).join('')}<th class="n">Jurado</th><th class="n">Final</th><th></th></tr>
+      ${calificados.map((x, i) => fila(x, i)).join('')}${sin.map((x) => fila(x, null)).join('')}</table></div></div>` };
+}
+// siguiente puesto a revelar: de abajo (ultimo premiado) hacia arriba (primer lugar)
+function siguientePodio() {
+  const lista = Object.values(pantalla.podio?.lista || {}); const rev = pantalla.podio?.revelados || 0;
+  return rev < lista.length ? lista[lista.length - 1 - rev] : null;
+}
+function pResultados() {
+  const box = $('#res'); if (!box) return;
+  box.innerHTML = `<div class="tarjeta fila"><div class="crece"><b>Fórmula:</b> ${(cfg.pesoPublico ?? 30) === 20 ? 'el público es el 5.º jurado (J5 = promedio simple de sus votos) · Final = promedio de J1, J2, J3, J4 y J5 (20 % cada uno)' : `Final = ${cfg.pesoPublico ?? 30}% × Público + ${100 - (cfg.pesoPublico ?? 30)}% × Jurado · Público = promedio simple de los votos`} ·
+    Desempate: mayor promedio de jurado · Premiación: 5 puestos; Pre-infantil 2 primeros, 2 segundos y 3 terceros.</div><button class="boton chico" id="informe">📄 Informe del evento y acta</button> <button class="boton secundario chico" id="csv">⬇ Exportar a Excel (CSV)</button></div>
+    ${CATEGORIAS.map((c) => tablaCategoria(c).html).join('')}`;
+  $('#csv').onclick = exportarCSV;
+  $('#informe').onclick = generarInforme;
+  $$('[data-podio]').forEach((b) => (b.onclick = async () => {
+    const cat = b.dataset.podio; const top = tablaCategoria(cat).calificados.slice(0, premiadosDe(cat)).map((x, i) => ({ id: x.p.id, nombre: x.p.nombre, final: x.final, jurado: x.promJurado, publico: x.promedio, puesto: puestoDe(cat, i) }));
+    bitacora('Podio en pantalla: ' + cat);
+    await fb.update(r('pantalla'), { modo: 'podio', podio: { categoria: cat, lista: top, revelados: 0 } });
+  }));
+  const rv = $('[data-podio-rev]'); if (rv) rv.onclick = () => { const n = Object.keys(pantalla.podio?.lista || {}).length; fb.update(r('pantalla/podio'), { revelados: Math.min(n, (pantalla.podio.revelados || 0) + 1) }); };
+}
+function exportarCSV() {
+  const idsJ = Object.keys(jur).sort();
+  const cab = ['Categoría', 'Puesto', 'ID', 'Participante', 'Canción', 'Votos público', 'Promedio público',
+    ...idsJ.map((j) => jur[j].nombre), 'Promedio jurado', 'Peso público %', 'Nota final', 'Completo'];
+  const filas = [cab];
+  for (const cat of CATEGORIAS) {
+    const { calificados } = tablaCategoria(cat);
+    const resto = partLista().filter((p) => p.categoria === cat && !calificados.find((x) => x.p.id === p.id)).map((p) => ({ p, ...resultadoDe(p.id) }));
+    [...calificados.map((x, i) => [x, i + 1]), ...resto.map((x) => [x, ''])].forEach(([x, pos]) => filas.push([
+      cat, pos, x.p.id, x.p.nombre, x.p.cancion || '', x.nVotos, x.promedio === null ? '' : x.promedio.toFixed(3),
+      ...idsJ.map((j) => (x.notasJ[j] === null ? '' : x.notasJ[j].toFixed(1))), x.promJurado === null ? '' : x.promJurado.toFixed(3),
+      x.pesoPublico, x.final === null ? '' : x.final.toFixed(2), x.completo ? 'Sí' : 'No']));
+  }
+  const celda = (c) => { let t = String(c); if (typeof c === 'number' || /^-?\d+\.\d+$/.test(t)) t = t.replace('.', ','); return `"${t.replace(/"/g, '""')}"`; };
+  descargar('resultados-gran-final.csv', filas.map((f) => f.map(celda).join(';')).join('\r\n'));
+}
+function sinClaves(b) { const o = {}; Object.entries(b || {}).forEach(([n, x]) => { const { k, ...resto } = x; o[n] = resto; }); return o; }
+function descargar(nombre, texto, tipo = 'text/csv;charset=utf-8') {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + texto], { type: tipo })); a.download = nombre; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+
+// =====================================================================
+//  INFORME DEL EVENTO Y ACTA (imprimible / guardar como PDF)
+// =====================================================================
+function generarInforme() {
+  const idsJ = Object.keys(jur).sort((a, b) => (jur[a].orden || 0) - (jur[b].orden || 0));
+  const hora = (t) => (t ? new Date(t).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '—');
+  const n2 = (x, d = 2) => (x === null || x === undefined ? '—' : num(x, d));
+  const todos = partLista();
+  const presentados = todos.filter((p) => cierres[p.id] || resultadoDe(p.id).juradosRecibidos);
+  const ausentes = todos.filter((p) => !presentados.includes(p));
+  const votosTot = presentados.reduce((a, p) => a + resultadoDe(p.id).nVotos, 0);
+  const porFin = {}; Object.values(boletas).forEach((b) => { porFin[b.finalista] = (porFin[b.finalista] || 0) + 1; });
+  const peso = cfg.pesoPublico == null ? 30 : cfg.pesoPublico;
+  const j5 = peso === 20;
+  const etJ = (j) => `J${jur[j].orden || ''}<br><small>${esc(jur[j].nombre)}</small>`;
+  const etP = j5 ? 'J5<br><small>Público</small>' : 'Público';
+  const cats = CATEGORIAS.map((cat) => {
+    const { calificados } = tablaCategoria(cat);
+    return { cat, filas: calificados.map((x, i) => ({ ...x, pos: i + 1, puesto: puestoDe(cat, i) })), noPres: todos.filter((p) => p.categoria === cat && !calificados.find((x) => x.p.id === p.id)) };
+  });
+  const pu = (x) => (x.puesto ? x.puesto + '.º' : '');
+  const tablaCat = ({ cat, filas, noPres }) => `<h3>Categoría ${esc(cat)}</h3>
+    <table><thead><tr><th>Pos.</th><th>Código</th><th>Participante</th><th>Municipio</th><th>Canción</th>${idsJ.map((j) => `<th class="n">${etJ(j)}</th>`).join('')}
+      <th class="n">${etP}</th><th class="n">Votos</th><th class="n">Nota final</th><th class="c">Puesto</th></tr></thead><tbody>
+    ${filas.map((x) => `<tr${x.puesto ? ' class="top"' : ''}><td class="c">${x.pos}</td><td>${esc(x.p.codigo || '')}</td><td>${esc(x.p.nombreCompleto || x.p.nombre)}</td><td>${esc(x.p.ciudad || '')}</td><td>${esc(x.p.cancion || '')}</td>
+      ${idsJ.map((j) => `<td class="n">${n2(x.notasJ[j], 1)}</td>`).join('')}<td class="n">${n2(x.promedio)}</td><td class="n">${x.nVotos}</td><td class="n"><b>${n2(x.final)}</b></td><td class="c"><b>${pu(x)}</b></td></tr>`).join('')}
+    ${noPres.map((p) => `<tr class="aus"><td class="c">—</td><td>${esc(p.codigo || '')}</td><td>${esc(p.nombreCompleto || p.nombre)}</td><td>${esc(p.ciudad || '')}</td><td colspan="${idsJ.length + 5}">No se presentó</td></tr>`).join('')}
+    </tbody></table>`;
+  const evs = Object.values(bitacoraDatos).sort((a, b) => a.t - b.t);
+  const firmaDe = (j) => ({ n: jur[j].nombre, d: (jurPriv[j] && jurPriv[j].doc) || 'C.C. ____________________', c: 'Jurado ' + (jur[j].orden || '') });
+  const ordJ = idsJ.slice().sort((a, b) => (jur[a].orden || 0) - (jur[b].orden || 0));
+  const fila1 = ordJ.slice(1).map(firmaDe);
+  const fila2 = [...ordJ.slice(0, 1).map(firmaDe), { n: cfg.repLegal || 'Representante legal', d: (jurPriv._rep && jurPriv._rep.doc) || 'C.C. ____________________', c: 'Representante legal' }];
+  const ganadoresTabla = (filas) => `<table class="gan"><thead><tr><th class="c" style="width:70px">Puesto</th><th>Nombre completo</th><th class="n" style="width:90px">Calificación</th></tr></thead><tbody>
+    ${filas.filter((x) => x.puesto).map((x) => `<tr><td class="c"><b>${pu(x)}</b></td><td>${esc(x.p.nombreCompleto || x.p.nombre)}</td><td class="n"><b>${n2(x.final)}</b></td></tr>`).join('') || '<tr><td colspan="3">Sin resultados</td></tr>'}</tbody></table>`;
+  const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Informe Gran Final Brilla & Canta 2026</title><style>
+    @page { size: letter landscape; margin: 14mm 14mm 14mm; }
+    * { box-sizing: border-box; } body { font-family: Arial, Helvetica, sans-serif; color: #1d1d1d; font-size: 10pt; margin: 0; }
+    .cab { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #4b1470; padding-bottom: 8px; margin-bottom: 14px; }
+    .cab img { width: 70px; } .cab b { font-size: 12pt; } .cab span { display: block; color: #555; }
+    h1 { font-size: 16pt; color: #4b1470; margin: 4px 0; } h2 { font-size: 12.5pt; color: #fff; background: #4b1470; padding: 4px 8px; margin: 18px 0 8px; break-after: avoid; }
+    h3 { font-size: 11pt; color: #4b1470; margin: 14px 0 6px; break-after: avoid; }
+    table { width: 100%; border-collapse: collapse; margin: 4px 0 10px; font-size: 8.6pt; } th, td { border: 1px solid #bbb; padding: 3px 5px; vertical-align: top; }
+    th { background: #efe7f6; text-align: left; } td.n, th.n { text-align: right; } td.c { text-align: center; } tr.top td { background: #fff6dc; } tr.aus td { color: #888; font-style: italic; }
+    tr { break-inside: avoid; } .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; } .kpi { border: 1px solid #ccc; border-radius: 6px; padding: 8px; } .kpi b { display: block; font-size: 16pt; color: #4b1470; }
+    .podio { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; } .podio div { border: 1px solid #ccc; border-radius: 6px; padding: 8px; break-inside: avoid; } .podio ol { margin: 4px 0 0; padding-left: 18px; }
+    .acta { break-before: page; } .acta p { line-height: 1.6; text-align: justify; }
+    .firmas { display: flex; justify-content: center; gap: 50px; margin-top: 54px; break-inside: avoid; } .firma { width: 240px; border-top: 1px solid #000; padding-top: 4px; text-align: center; font-size: 9.5pt; line-height: 1.35; } .firma b { display: block; }
+    table.gan { width: 60%; } .nota { font-size: 8.6pt; color: #555; }
+    .barra { position: fixed; top: 8px; right: 8px; } @media print { .barra { display: none; } }
+    .barra button { font-size: 12pt; padding: 8px 14px; cursor: pointer; }
+  </style></head><body>
+  <div class="barra"><button onclick="print()">🖨 Imprimir / Guardar como PDF</button></div>
+  <div class="cab"><img src="${location.href.replace(/[^/]*$/, '')}img/logo.webp" alt=""><div><b>CORPORACIÓN ARTÍSTICA Y CULTURAL BRILLA Y CANTA</b><span>NIT. 901978603-7 · San&nbsp;José&nbsp;de&nbsp;Cúcuta, Norte de Santander</span></div></div>
+  <h1>Informe del evento · Gran Final del II Festival de la Canción Brilla &amp; Canta 2026</h1>
+  <div>${esc(cfg.fecha || '20 de noviembre de 2026')}${cfg.lugar ? ' · ' + esc(cfg.lugar) : ''} · Generado el ${new Date().toLocaleString('es-CO')}</div>
+
+  <h2>1. Resumen</h2>
+  <div class="kpis">
+    <div class="kpi"><b>${todos.length}</b>finalistas convocados</div>
+    <div class="kpi"><b>${presentados.length}</b>presentaciones realizadas</div>
+    <div class="kpi"><b>${Object.keys(boletas).length}</b>asistentes registrados con boleta</div>
+    <div class="kpi"><b>${votosTot.toLocaleString('es-CO')}</b>calificaciones del público</div>
+    <div class="kpi"><b>${idsJ.length}</b>jurados calificadores</div>
+    <div class="kpi"><b>${presentados.length ? num(votosTot / presentados.length, 1) : '—'}</b>votos del público por presentación (promedio)</div>
+  </div>
+  <p><b>Jurado calificador:</b> ${idsJ.map((j) => esc(jur[j].nombre)).join(', ')}.<br>
+  <b>Metodología:</b> cada jurado calificó de 0,0 a 10,0. El público asistente, registrado con su boleta mediante código QR, calificó de 0 a 10 desde su celular (un voto por boleta). ${j5 ? 'El promedio del público se toma como la calificación de un quinto jurado (J5): la nota final es el promedio de las cinco calificaciones (J1 a J5), es decir, 20 % cada una.' : `Nota final = ${100 - peso} % promedio del jurado + ${peso} % promedio del público.`} Desempate: mayor promedio del jurado. Se premian 5 puestos por categoría; en Pre-infantil se premian sus 7 participantes presenciales (dos en primer lugar, dos en segundo y tres en tercero).</p>
+  ${ausentes.length ? `<p><b>No se presentaron:</b> ${ausentes.map((p) => esc(p.nombreCompleto || p.nombre) + ' (' + esc(p.categoria) + ')').join('; ')}.</p>` : ''}
+
+  <h2>2. Ganadores</h2>
+  <div class="podio">${cats.map(({ cat, filas }) => `<div><b>${esc(cat)}</b><ul style="list-style:none;padding:0;margin:4px 0 0">${filas.filter((x) => x.puesto).map((x) => `<li><b>${pu(x)}</b> ${esc(x.p.nombreCompleto || x.p.nombre)} — ${n2(x.final)}</li>`).join('') || '<li>Sin resultados</li>'}</ul></div>`).join('')}</div>
+
+  <h2>3. Resultados detallados</h2>
+  ${cats.map(tablaCat).join('')}
+
+  <h2>4. Participación del público por finalista</h2>
+  <p>Asistentes que, al registrarse, indicaron a qué finalista acompañaban.</p>
+  <table><thead><tr><th>Finalista</th><th>Categoría</th><th class="n">Acompañantes registrados</th></tr></thead><tbody>
+    ${todos.map((p) => ({ p, n: porFin[p.id] || 0 })).filter((x) => x.n).sort((a, b) => b.n - a.n).map((x) => `<tr><td>${esc(x.p.nombreCompleto || x.p.nombre)}</td><td>${esc(x.p.categoria)}</td><td class="n">${x.n}</td></tr>`).join('')}
+    <tr><td>Público general</td><td></td><td class="n">${porFin.NINGUNO || 0}</td></tr></tbody></table>
+
+  <h2>5. Desarrollo del evento (bitácora)</h2>
+  <table><thead><tr><th style="width:70px">Hora</th><th>Momento</th></tr></thead><tbody>
+    ${evs.map((e) => `<tr><td>${hora(e.t)}</td><td>${esc(e.texto)}</td></tr>`).join('') || '<tr><td colspan="2">Sin registros.</td></tr>'}</tbody></table>
+
+  <div class="acta">
+    <div class="cab"><img src="${location.href.replace(/[^/]*$/, '')}img/logo.webp" alt=""><div><b>CORPORACIÓN ARTÍSTICA Y CULTURAL BRILLA Y CANTA</b><span>NIT. 901978603-7</span></div></div>
+    <h1>Acta de calificaciones · Gran Final del II Festival de la Canción Brilla &amp; Canta 2026</h1>
+    <p>En San&nbsp;José&nbsp;de&nbsp;Cúcuta, el ${esc(cfg.fecha || '20 de noviembre de 2026')}${cfg.lugar ? ', en el ' + esc(cfg.lugar) : ''}, se realizó la Gran Final del II Festival de la Canción Brilla &amp; Canta, organizada por la Corporación Artística y Cultural Brilla y Canta. El jurado calificador, integrado por ${ordJ.map((j) => esc(jur[j].nombre)).join(', ')}, evaluó las interpretaciones de los finalistas de las categorías Pre-infantil, Infantil, Juvenil y Sénior con calificaciones de 0,0 a 10,0. ${j5 ? 'El promedio de las calificaciones del público asistente se toma como un quinto jurado (J5), y la nota final es el promedio de las cinco calificaciones.' : `La nota final resulta de ponderar el promedio del jurado (${100 - peso} %) y el del público (${peso} %).`} Con base en lo anterior, se declaran los siguientes resultados:</p>
+    ${cats.map(({ cat, filas, noPres }) => `<h3>Categoría ${esc(cat)}</h3><table><thead><tr><th class="c">N.º</th><th>Participante</th>${idsJ.map((j) => `<th class="n">${etJ(j)}</th>`).join('')}<th class="n">${etP}</th><th class="n">Nota final</th><th class="c">Puesto</th></tr></thead><tbody>
+      ${filas.map((x) => `<tr${x.puesto ? ' class="top"' : ''}><td class="c">${x.pos}</td><td>${esc(x.p.nombreCompleto || x.p.nombre)}</td>${idsJ.map((j) => `<td class="n">${n2(x.notasJ[j], 1)}</td>`).join('')}<td class="n">${n2(x.promedio)}</td><td class="n"><b>${n2(x.final)}</b></td><td class="c"><b>${pu(x)}</b></td></tr>`).join('')}
+      ${noPres.map((p) => `<tr class="aus"><td class="c">—</td><td>${esc(p.nombreCompleto || p.nombre)}</td><td colspan="${idsJ.length + 3}">No se presentó</td></tr>`).join('')}</tbody></table>
+      <div class="nota"><b>Ganadores${cat === 'Pre-infantil' ? ' (Pre-infantil: se premian las 7 participantes presenciales)' : ''}</b></div>${ganadoresTabla(filas)}`).join('')}
+    <div style="break-inside: avoid"><p>Para constancia se firma por quienes intervinieron.</p>
+    <div class="firmas">${fila1.map((f) => `<div class="firma"><b>${esc(f.n)}</b>${esc(f.d)}<br>${esc(f.c)}</div>`).join('')}</div>
+    <div class="firmas">${fila2.map((f) => `<div class="firma"><b>${esc(f.n)}</b>${esc(f.d)}<br>${esc(f.c)}</div>`).join('')}</div></div>
+  </div>
+  </body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) return aviso('El navegador bloqueó la ventana: permite ventanas emergentes para esta página.', 'error', 6000);
+  w.document.open(); w.document.write(html); w.document.close();
+}
+// =====================================================================
+//  BOLETAS
+// =====================================================================
+function pBoletas() {
+  const abierto = registro.abierto === true;
+  app.innerHTML = `<div class="dos-col"><div>
+    <div class="tarjeta"><h2>Registro de boletas</h2>
+      <div class="kpis"><div class="kpi"><b id="b-total">${nBoletas()}</b><span>boletas registradas</span></div>
+        <div class="kpi"><b>${validas ? Object.keys(validas).length : '—'}</b><span>boletas válidas cargadas</span></div></div>
+      <div class="fila" style="margin-top:14px"><span class="crece">Registro: <b style="color:${abierto ? 'var(--verde)' : 'var(--rojo)'}">${abierto ? 'ABIERTO' : 'CERRADO'}</b></span>
+        <button class="boton ${abierto ? 'rojo' : 'verde'} chico" id="b-toggle">${abierto ? 'Cerrar registro' : 'Abrir registro'}</button></div></div>
+    <div class="tarjeta"><h3>Boletas válidas (opcional)</h3>
+      <p class="suave chico">Si cargas el rango de boletas impresas, nadie podrá registrar un número que no exista. Ej.: 001 a 600.</p>
+      <div class="fila"><input id="b-desde" inputmode="numeric" maxlength="3" placeholder="Desde" style="width:100px"><input id="b-hasta" inputmode="numeric" maxlength="3" placeholder="Hasta" style="width:100px">
+        <button class="boton chico" id="b-rango">Aplicar rango</button><button class="boton secundario chico" id="b-sinrango">Quitar restricción</button></div></div>
+  </div>
+  <div class="tarjeta" id="b-sospechosos"></div>
+  <div class="tarjeta"><h3>Buscar y liberar boletas</h3>
+    <p class="suave chico">Si alguien registró un número que no es suyo, o cambió de celular o de navegador, libéralo aquí y pide que lo registre de nuevo con su boleta física en la mano. Los votos que ya hizo esa boleta se conservan.</p>
+    <input id="b-buscar" placeholder="Número o nombre" value="${esc(busquedaBoleta)}">
+    <div class="envoltura-tabla" style="margin-top:10px" id="b-tabla"></div></div></div>`;
+  app.onclick = null;
+  $('#b-toggle').onclick = async () => { await fb.set(r('registro/abierto'), !abierto); pBoletas(); };
+  $('#b-buscar').oninput = (e) => { busquedaBoleta = e.target.value; pBoletasTabla(); };
+  $('#b-rango').onclick = async () => {
+    const d = Number($('#b-desde').value), h = Number($('#b-hasta').value);
+    if (!(d >= 0 && h <= 999 && h >= d)) return aviso('Rango inválido', 'error');
+    const m = {}; for (let i = d; i <= h; i++) m[pad3(i)] = true;
+    const fuera = Object.keys(boletas).filter((n) => !m[n]);
+    await fb.set(r('boletasValidas'), m); aviso(`Rango ${pad3(d)}–${pad3(h)} aplicado${fuera.length ? ` · ⚠ ${fuera.length} boletas ya registradas quedan fuera del rango` : ''}`, fuera.length ? 'error' : 'ok', 6000); pBoletas();
+  };
+  $('#b-sinrango').onclick = async () => { await fb.set(r('boletasValidas'), null); aviso('Sin restricción de números'); pBoletas(); };
+  pBoletasTabla();
+}
+function pSospechosos() {
+  const box = $('#b-sospechosos'); if (!box) return;
+  // acompanantes por finalista
+  const porFin = {};
+  Object.values(boletas).forEach((b) => { porFin[b.finalista] = (porFin[b.finalista] || 0) + 1; });
+  const filas = partLista().map((p) => ({ p, n: porFin[p.id] || 0 })).sort((a, b) => b.n - a.n);
+  // varias boletas desde el mismo celular (solo deberia haber una por celular)
+  const porDisp = {};
+  Object.entries(boletas).forEach(([n, b]) => { (porDisp[b.d] = porDisp[b.d] || []).push(n); });
+  const repetidos = Object.values(porDisp).filter((l) => l.length > 1).sort((a, b) => b.length - a.length);
+  box.innerHTML = `<h3>Acompañantes por finalista</h3>
+    <div class="envoltura-tabla" style="max-height:260px"><table class="tabla"><tr><th>Finalista</th><th>Categoría</th><th class="n">Registrados</th></tr>
+      ${filas.map((x) => `<tr><td>${esc(x.p.nombre)}</td><td class="suave chico">${esc(x.p.categoria)}</td><td class="n"><b>${x.n}</b></td></tr>`).join('')}
+      <tr><td>Público general</td><td></td><td class="n"><b>${porFin.NINGUNO || 0}</b></td></tr></table></div>
+    <h3 style="margin-top:14px">Celulares con más de una boleta</h3>
+    <p class="suave chico">La página permite una boleta por celular. Si aparece aquí un mismo celular con varias, alguien está registrando números a propósito: revisa y libera.</p>
+    ${repetidos.length ? repetidos.map((l) => `<div style="margin:6px 0"><span class="chip rojo">${l.length} boletas</span> ${esc(boletas[l[0]].nombre)} · <span class="suave chico">${l.sort().join(', ')}</span></div>`).join('') : '<p class="suave chico">Ninguno.</p>'}`;
+}
+function pBoletasTabla() {
+  pSospechosos();
+  const box = $('#b-tabla'); if (!box) return;
+  const t = $('#b-total'); if (t) t.textContent = nBoletas();
+  const q = busquedaBoleta.trim().toLowerCase();
+  const lista = Object.entries(boletas).filter(([n, b]) => !q || n.includes(q) || (b.nombre || '').toLowerCase().includes(q)).sort((a, b) => a[0].localeCompare(b[0]));
+  box.innerHTML = `<table class="tabla"><tr><th>Número</th><th>Nombre</th><th>Acompaña a</th><th>Hora</th><th></th></tr>${lista.slice(0, 300).map(([n, b]) => `<tr><td><b>${n}</b></td><td>${esc(b.nombre)}</td><td class="suave chico">${esc(b.finalista === 'NINGUNO' ? 'Público general' : (part[b.finalista] || {}).nombre || '')}</td>
+    <td class="mono suave">${b.t ? new Date(b.t).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : ''}</td><td><button class="boton secundario chico" data-liberar="${n}">Liberar</button></td></tr>`).join('')}</table>
+    ${lista.length > 300 ? `<p class="suave chico">Mostrando 300 de ${lista.length}. Afina la búsqueda.</p>` : ''}${!lista.length ? '<p class="suave">Sin resultados.</p>' : ''}`;
+  $$('[data-liberar]', box).forEach((b) => (b.onclick = async () => {
+    const n = b.dataset.liberar; const x = boletas[n]; if (!x) return;
+    if (b.dataset.confirmar !== '1') { b.dataset.confirmar = '1'; b.textContent = '¿Seguro? Liberar'; b.classList.add('rojo'); return; }
+    await fb.set(r('boletas/' + n), null);
+    aviso('Boleta ' + n + ' liberada');
+  }));
+}
+
+// =====================================================================
+//  AJUSTES
+// =====================================================================
+const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function codigoNuevo(n = 6) { const a = crypto.getRandomValues(new Uint32Array(n)); return Array.from(a, (x) => ALFABETO[x % ALFABETO.length]).join(''); }
+const enlaceJurado = (j) => `${URL_BASE}jurados.html?j=${encodeURIComponent(j)}&c=${encodeURIComponent(jurPriv[j]?.codigo || '')}`;
+function pAjustes() {
+  const idsJ = Object.keys(jur).sort();
+  app.innerHTML = `<div class="dos-col"><div>
+    <form class="tarjeta" id="f-peso"><h2>Calificación</h2>
+      <div class="campo"><label>Peso del público en la nota final (%)</label><input id="a-peso" type="number" min="0" max="100" step="1" value="${cfg.pesoPublico ?? 30}"></div>
+      <div class="campo"><label>Cuenta regresiva antes de cerrar la votación (segundos)</label><input id="a-cuenta" type="number" min="3" max="60" step="1" value="${segCuenta()}"></div>
+      <p class="suave chico">El público cuenta con el promedio simple de sus votos. Ejemplo con 30 %: Final = 0,30 × promedio público + 0,70 × promedio jurado.</p>
+      <div class="campo"><label>Lugar del evento (para el informe y el acta)</label><input id="a-lugar" maxlength="120" value="${esc(cfg.lugar || '')}" placeholder="Ej. Teatro Municipal Zulima, San José de Cúcuta"></div>
+      <div class="campo"><label>Representante legal (firma el acta)</label><input id="a-rep" maxlength="80" value="${esc(cfg.repLegal || '')}"></div>
+      <button class="boton">Guardar</button></form>
+    <div class="tarjeta"><div class="fila"><h2 class="crece" style="margin:0">Jurados</h2><button class="boton secundario chico" id="a-jur-mas">+ Agregar jurado</button></div>
+      <p class="suave chico">Cada jurado entra con su propio enlace o QR. Si un código se filtra, genera uno nuevo.</p>
+      ${idsJ.map((j) => `<div class="fila" style="margin:10px 0;padding:10px;background:rgba(0,0,0,.2);border-radius:12px">
+        <input class="crece" data-jnombre="${j}" value="${esc(jur[j].nombre)}" style="min-width:160px">
+        <span class="chip ${jurSes[j] ? 'verde' : ''}">${jurSes[j] ? 'Conectado' : 'Sin entrar'}</span>
+        <code style="font-size:1.05rem;letter-spacing:.1em">${esc(jurPriv[j]?.codigo || '—')}</code>
+        <button class="boton secundario chico" data-jqr="${j}">QR / enlace</button>
+        <button class="boton secundario chico" data-jcod="${j}">Nuevo código</button>
+        <button class="boton secundario chico" data-jdel="${j}" title="Eliminar jurado">✕</button></div>`).join('')}
+      <button class="boton chico" id="a-jur-guardar">Guardar nombres</button></div>
+    <div class="tarjeta"><h2>Zona de pruebas</h2>
+      <p class="suave chico">Borra votos, notas, cierres y boletas, y deja la pantalla en espera. Úsalo después del ensayo general, NUNCA durante el evento.</p>
+      <div class="fila"><input id="a-borrar" placeholder='Escribe BORRAR' style="max-width:200px"><button class="boton rojo chico" id="a-borrar-btn">Borrar datos del ensayo</button></div>
+      <button class="boton secundario chico" id="a-respaldo" style="margin-top:12px">⬇ Descargar respaldo completo (JSON)</button></div>
+    </div>
+    <div class="tarjeta"><h2>Participantes</h2><p class="suave chico">Corrige nombres o agrega la canción y la ciudad. Los cambios se ven al instante en todas las pantallas.</p>
+      <div class="envoltura-tabla"><table class="tabla"><tr><th></th><th>Nombre</th><th>Canción</th><th>Ciudad</th><th>Orden</th><th></th></tr>
+      ${partLista().map((p) => `<tr data-pid="${p.id}"><td><img src="${foto(p, true)}" style="width:34px;border-radius:6px" alt=""></td>
+        <td><input data-c="nombre" value="${esc(p.nombre)}"></td><td><input data-c="cancion" value="${esc(p.cancion || '')}"></td>
+        <td><input data-c="ciudad" value="${esc(p.ciudad || '')}" style="width:120px"></td><td><input data-c="orden" type="number" value="${p.orden}" style="width:70px"></td>
+        <td><button class="boton secundario chico" data-guardar-p="${p.id}">Guardar</button></td></tr>`).join('')}</table></div></div></div>`;
+  app.onclick = null;
+  $('#f-peso').onsubmit = async (e) => {
+    e.preventDefault(); const peso = Number($('#a-peso').value);
+    if (!(peso >= 0 && peso <= 100)) return aviso('Peso entre 0 y 100', 'error');
+    await fb.update(r('config'), { pesoPublico: peso, cuentaSeg: Math.max(3, Math.min(60, Number($('#a-cuenta').value) || 15)), lugar: $('#a-lugar').value.trim(), repLegal: $('#a-rep').value.trim() }); aviso('Guardado');
+  };
+  $('#a-jur-guardar').onclick = async () => { const u = {}; $$('[data-jnombre]').forEach((i) => (u[i.dataset.jnombre + '/nombre'] = i.value.trim() || i.dataset.jnombre)); await fb.update(r('jurados'), u); aviso('Nombres guardados'); pAjustes(); };
+  $('#a-jur-mas').onclick = async () => { let k = 1; while (jur['J' + k]) k++; const id = 'J' + k; await fb.update(r(''), { ['jurados/' + id]: { nombre: 'Jurado ' + k, orden: k }, ['juradosPriv/' + id]: { codigo: codigoNuevo() } }); pAjustes(); };
+  $$('[data-jcod]').forEach((b) => (b.onclick = async () => { const j = b.dataset.jcod; await fb.update(r(''), { ['juradosPriv/' + j + '/codigo']: codigoNuevo(), ['juradoSesion/' + j]: null }); aviso('Código nuevo para ' + jur[j].nombre); pAjustes(); }));
+  $$('[data-jdel]').forEach((b) => (b.onclick = async () => {
+    if (b.dataset.ok !== '1') { b.dataset.ok = '1'; b.textContent = '¿Eliminar?'; return; }
+    const j = b.dataset.jdel; await fb.update(r(''), { ['jurados/' + j]: null, ['juradosPriv/' + j]: null, ['juradoSesion/' + j]: null }); pAjustes();
+  }));
+  $$('[data-jqr]').forEach((b) => (b.onclick = () => {
+    const j = b.dataset.jqr, url = enlaceJurado(j); const d = document.createElement('div'); d.className = 'modal';
+    d.innerHTML = `<div class="tarjeta centro"><h2>${esc(jur[j].nombre)}</h2><div class="qr-blanco">${qrSVG(url)}</div>
+      <p class="chico" style="word-break:break-all">${esc(url)}</p><div class="fila" style="justify-content:center"><button class="boton" id="q-copiar">Copiar enlace</button><button class="boton secundario" id="q-cerrar">Cerrar</button></div></div>`;
+    document.body.appendChild(d);
+    d.querySelector('#q-cerrar').onclick = () => d.remove();
+    d.querySelector('#q-copiar').onclick = () => navigator.clipboard.writeText(url).then(() => aviso('Enlace copiado'));
+  }));
+  $$('[data-guardar-p]').forEach((b) => (b.onclick = async () => {
+    const id = b.dataset.guardarP; const tr = b.closest('tr'); const v = (c) => tr.querySelector(`[data-c="${c}"]`).value.trim();
+    await fb.update(r('participantes/' + id), { nombre: v('nombre'), cancion: v('cancion'), ciudad: v('ciudad'), orden: Number(v('orden')) || 0 }); aviso('Guardado: ' + v('nombre'));
+  }));
+  $('#a-borrar-btn').onclick = async () => {
+    if ($('#a-borrar').value !== 'BORRAR') return aviso('Escribe BORRAR para confirmar', 'error');
+    await fb.update(r(''), { votos: null, notas: null, cierres: null, boletas: null, historial: null, bitacora: null });
+    await fb.set(r('estado'), { cantanteId: '', votacion: 'CERRADA', juradoAbierto: false, sesion: codigoNuevo(8) });
+    await fb.set(r('pantalla'), { modo: 'espera' });
+    aviso('Datos del ensayo borrados'); pAjustes();
+  };
+  $('#a-respaldo').onclick = () => descargar('respaldo-gran-final.json', JSON.stringify({ config: cfg, estado, participantes: part, jurados: jur, boletas: sinClaves(boletas), notas, cierres, fecha: new Date().toISOString() }, null, 1), 'application/json');
+}
+
+// =====================================================================
+//  ARRANQUE
+// =====================================================================
+function escuchar(ruta, fn) { return fb.onValue(r(ruta), (s) => { fn(s.val()); pintar(); }, (e) => console.warn('lectura', ruta, e)); }
+function escucharVotosActual() {
+  if (cidVotos === estado.cantanteId) return;
+  if (offVotos) offVotos(); votosActual = {}; cidVotos = estado.cantanteId;
+  if (cidVotos) offVotos = escuchar('votos/' + cidVotos, (v) => (votosActual = v || {}));
+}
+function arrancarPanel() {
+  $('#pestanas').classList.remove('oculto');
+  $$('#pestanas button').forEach((b) => (b.onclick = () => cambiarPestana(b.dataset.t)));
+  escuchar('config', (v) => (cfg = v || {}));
+  escuchar('estado', (v) => {
+    estado = v || {}; escucharVotosActual();
+    // si el control se recargo en plena cuenta regresiva, se limpia (el operador la vuelve a lanzar)
+    if (!cuentaTimer && estado.quedan != null) fb.update(r(''), { 'estado/quedan': null, 'pantalla/vivo/quedan': null }).catch(() => {});
+  });
+  escuchar('participantes', (v) => (part = conIds(v)));
+  escuchar('jurados', (v) => (jur = v || {}));
+  escuchar('invitadas', (v) => (invitadas = v || {}));
+  escuchar('historial', (v) => (historial = v || {}));
+  escuchar('bitacora', (v) => (bitacoraDatos = v || {}));
+  escuchar('juradosPriv', (v) => (jurPriv = v || {}));
+  escuchar('juradoSesion', (v) => (jurSes = v || {}));
+  escuchar('boletas', (v) => (boletas = v || {}));
+  escuchar('boletasValidas', (v) => (validas = v));
+  escuchar('notas', (v) => (notas = v || {}));
+  escuchar('cierres', (v) => (cierres = v || {}));
+  escuchar('registro', (v) => (registro = v || {}));
+  escuchar('pantalla', (v) => (pantalla = v || {}));
+  cambiarPestana('vivo');
+}
+try { U = await sesion(); } catch (e) { app.innerHTML = '<div class="tarjeta centro"><h2>No se pudo conectar con Firebase</h2><p class="suave">Revisa internet y la configuración (js/config.js), y recarga.</p></div>'; throw e; }
+try { const s = await fb.get(r('admins/' + U.uid)); if (s.exists()) arrancarPanel(); else pintarLogin(); }
+catch (e) { pintarLogin(); }
+</script>
+</body>
+</html>

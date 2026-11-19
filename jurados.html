@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12051d">
+<meta name="robots" content="noindex">
+<title>Jurado · Brilla & Canta</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  .jurado-nombre { font-family: var(--display); font-weight: 800; color: var(--oro); }
+  .cantante { display: flex; gap: 14px; align-items: center; }
+  .cantante img { width: 96px; border-radius: 14px; box-shadow: 0 0 0 2px rgba(245,196,81,.5); }
+  .cantante h2 { font-size: 1.3rem; margin: 0; }
+  .pantalla-nota { text-align: center; font: 800 4.2rem var(--display); color: var(--oro); line-height: 1; margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
+  .pantalla-nota.vacia { color: rgba(255,255,255,.2); }
+  .teclas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin-bottom: 10px; }
+  .teclas.dec { grid-template-columns: repeat(5, 1fr); }
+  .tecla { padding: 12px 0; border-radius: 12px; border: 1px solid var(--panel-borde); background: rgba(255,255,255,.07); color: var(--texto); font: 800 1.15rem var(--display); cursor: pointer; }
+  .tecla.on { background: linear-gradient(180deg,#ffd978,var(--oro-fuerte)); color: #1b0b28; border-color: transparent; }
+  .tecla:disabled { opacity: .25; }
+  .guardada { text-align: center; margin: 8px 0 0; }
+  .historial td { padding: 6px 4px; border-bottom: 1px solid var(--panel-borde); }
+  .historial { width: 100%; border-collapse: collapse; font-size: .9rem; }
+</style>
+</head>
+<body>
+<div id="cab"></div>
+<main class="contenedor" id="app"><div class="cargando"><div><div class="giro"></div>Conectando…</div></div></main>
+
+<script nomodule>
+  document.getElementById('app').innerHTML = '<div class="tarjeta" style="text-align:center"><h2>Tu navegador es muy antiguo</h2><p>Abre este enlace en Chrome o Safari actualizados, o acércate a la mesa de información para registrar tu boleta.</p></div>';
+</script>
+<script type="module">
+import { fb, r, sesion, $, esc, aviso, esPermiso, foto, num, htmlEncabezado, vigilarConexion, ahora, conIds } from './js/comun.js';
+$('#cab').innerHTML = htmlEncabezado();
+vigilarConexion($('#conexion'));
+const app = $('#app');
+const qs = new URLSearchParams(location.search);
+
+let U, jurados = {}, participantes = {}, estado = {};
+let J = localStorage.getItem('bc_jurado') || '';
+let entero = null, decima = 0, guardadaD = null, firma = '';
+let offNota = null;
+
+function pintarLogin(msg = '') {
+  const lista = Object.entries(jurados).sort((a, b) => (a[1].orden || 0) - (b[1].orden || 0));
+  const pre = qs.get('j') || '';
+  app.innerHTML = `<form class="tarjeta" id="f-login">
+    <h2>Panel de jurado</h2>
+    <p class="suave">Ingresa con el código personal que te entregó producción.</p>
+    <div class="campo"><label>Jurado</label><select id="sel-j">${lista.map(([id, j]) => `<option value="${id}" ${id === pre ? 'selected' : ''}>${esc(j.nombre)}</option>`).join('')}</select></div>
+    <div class="campo"><label>Código personal</label><input id="codigo" autocomplete="off" autocapitalize="characters" value="${esc(qs.get('c') || '')}"></div>
+    <button class="boton bloque">Entrar</button>
+    ${msg ? `<p class="res-mal" style="color:#ffb3b5;margin-top:10px">${esc(msg)}</p>` : ''}
+  </form>`;
+  $('#f-login').onsubmit = async (e) => {
+    e.preventDefault();
+    const j = $('#sel-j').value, codigo = $('#codigo').value.trim().toUpperCase();
+    try {
+      await fb.set(r('juradoSesion/' + j), { uid: U.uid, codigo });
+      localStorage.setItem('bc_jurado', j); J = j; firma = ''; history.replaceState(null, '', 'jurados.html');
+      aviso('Bienvenido, ' + ((jurados[j] && jurados[j].nombre) || j)); escucharNotaActual(); pintar();
+    } catch (err) { pintarLogin(esPermiso(err) ? 'Código incorrecto, o esa silla ya está abierta en otro celular. Si cambiaste de celular, pide a producción un código nuevo.' : 'Sin conexión, intenta de nuevo.'); }
+  };
+  if (qs.get('c') && jurados[pre] && !autoIntentado) { autoIntentado = true; const f = $('#f-login'); if (f.requestSubmit) f.requestSubmit(); else f.querySelector('button').click(); }
+}
+let autoIntentado = false;
+
+async function verificarSesion() {
+  if (!J) return false;
+  try { const s = await fb.get(r('juradoSesion/' + J)); return s.exists() && s.val().uid === U.uid; }
+  catch (e) { return false; }
+}
+
+function historial() { try { return JSON.parse(localStorage.getItem('bc_hist_' + J) || '{}'); } catch (e) { return {}; } }
+
+function pintar() {
+  if (!J) { const fl = 'login|' + Object.keys(jurados).join(','); if (fl === firma) return; firma = fl; return pintarLogin(); }
+  const cid = estado.cantanteId, p = participantes[cid];
+  const abierto = !!(p && estado.juradoAbierto);
+  const f = [cid, abierto, guardadaD, Object.keys(participantes).length].join('|');
+  if (f === firma) return; firma = f;
+  const hist = historial();
+  const filasHist = Object.entries(hist).sort((a, b) => b[1].t - a[1].t)
+    .map(([id, h]) => `<tr><td>${esc((participantes[id] && participantes[id].nombre) || id)}</td><td class="suave chico">${esc((participantes[id] && participantes[id].categoria) || '')}</td><td style="text-align:right"><b>${num(h.d / 10, 1)}</b></td></tr>`).join('');
+  app.innerHTML = `
+    <div class="fila" style="margin-bottom:12px"><span class="crece">Jurado: <span class="jurado-nombre">${esc((jurados[J] && jurados[J].nombre) || J)}</span></span>
+      <button class="boton secundario chico" id="salir">Salir</button></div>
+    ${p ? `<section class="tarjeta">
+      <div class="cantante"><img src="${foto(p, true)}" alt=""><div><div class="suave chico">${abierto ? 'EN ESCENA' : 'CALIFICACIÓN CERRADA'}</div><h2>${esc(p.nombre)}</h2>
+        <div class="suave">${esc(p.categoria)}${p.cancion ? ' · «' + esc(p.cancion) + '»' : ''}</div></div></div>
+      ${abierto ? `
+        <div class="pantalla-nota ${entero === null ? 'vacia' : ''}" id="visor">${entero === null ? '—' : num(entero + decima / 10, 1)}</div>
+        <div class="teclas" id="enteros">${[0,1,2,3,4,5,6,7,8,9,10].map((n) => `<button class="tecla${entero === n ? ' on' : ''}" data-n="${n}">${n}</button>`).join('')}</div>
+        <div class="teclas dec" id="decimas">${[0,1,2,3,4,5,6,7,8,9].map((d) => `<button class="tecla${decima === d ? ' on' : ''}" data-d="${d}">,${d}</button>`).join('')}</div>
+        <button class="boton bloque" id="guardar" ${entero === null ? 'disabled' : ''}>${guardadaD === null ? 'Guardar nota' : 'Actualizar nota'}</button>
+        <p class="guardada suave" id="txt-guardada">${guardadaD === null ? 'Aún no has calificado a este participante.' : `Nota guardada: <b style="color:var(--verde)">${num(guardadaD / 10, 1)}</b> — puedes cambiarla mientras la calificación esté abierta.`}</p>
+      ` : `<p class="suave" style="margin-top:12px">${guardadaD === null ? 'La calificación de jurado para este participante está cerrada.' : 'Tu nota final: <b>' + num(guardadaD / 10, 1) + '</b>'}</p>`}
+    </section>` : `<section class="tarjeta centro"><h2>Esperando al siguiente participante</h2><p class="suave">Esta pantalla cambia sola cuando producción lo ponga en escena.</p></section>`}
+    ${filasHist ? `<section class="tarjeta"><h3>Mis calificaciones</h3><table class="historial">${filasHist}</table></section>` : ''}`;
+  $('#salir').onclick = () => { localStorage.removeItem('bc_jurado'); J = ''; firma = ''; pintar(); };
+  if (!abierto) return;
+  const refrescar = () => {
+    $('#visor').textContent = entero === null ? '—' : num(entero + decima / 10, 1);
+    $('#visor').classList.toggle('vacia', entero === null);
+    document.querySelectorAll('#enteros .tecla').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === entero));
+    document.querySelectorAll('#decimas .tecla').forEach((b) => { b.classList.toggle('on', Number(b.dataset.d) === decima); b.disabled = entero === 10 && Number(b.dataset.d) > 0; });
+    $('#guardar').disabled = entero === null;
+  };
+  document.querySelectorAll('#enteros .tecla').forEach((b) => (b.onclick = () => { entero = Number(b.dataset.n); if (entero === 10) decima = 0; refrescar(); }));
+  document.querySelectorAll('#decimas .tecla').forEach((b) => (b.onclick = () => { decima = Number(b.dataset.d); refrescar(); }));
+  refrescar();
+  $('#guardar').onclick = async () => {
+    const d = entero * 10 + decima; const btn = $('#guardar'); btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      await fb.set(r(`notas/${cid}/${J}`), { d, t: ahora() });
+      const h = historial(); h[cid] = { d, t: Date.now() }; localStorage.setItem('bc_hist_' + J, JSON.stringify(h));
+      aviso('Nota guardada: ' + num(d / 10, 1));
+    } catch (err) {
+      aviso(!esPermiso(err) ? 'Sin conexión: la nota NO se guardó. Intenta de nuevo.' : (estado.juradoAbierto && estado.cantanteId === cid ? 'Tu sesión expiró (producción cambió tu código). Sal y vuelve a entrar con tu nuevo enlace.' : 'La calificación para este participante ya se cerró.'), 'error', 6000);
+      btn.disabled = false; btn.textContent = guardadaD === null ? 'Guardar nota' : 'Actualizar nota';
+    }
+  };
+}
+
+function escucharNotaActual() {
+  if (offNota) { offNota(); offNota = null; }
+  guardadaD = null; entero = null; decima = 0;
+  const cid = estado.cantanteId; if (!cid || !J) return;
+  offNota = fb.onValue(r(`notas/${cid}/${J}`), (s) => {
+    const v = s.val(); guardadaD = v ? v.d : null;
+    if (v && entero === null) { entero = Math.floor(v.d / 10); decima = v.d % 10; }
+    firma = ''; pintar();
+  }, () => {});
+}
+
+async function iniciar() {
+  try { U = await sesion(); } catch (e) { app.innerHTML = '<div class="tarjeta centro"><h2>No se pudo conectar</h2><p class="suave">Revisa tu conexión a internet y recarga la página.</p></div>'; return; }
+  if (!(await verificarSesion())) { J = ''; localStorage.removeItem('bc_jurado'); }
+  fb.onValue(r('jurados'), (s) => { jurados = s.val() || {}; firma = ''; pintar(); });
+  fb.onValue(r('participantes'), (s) => { participantes = conIds(s.val()); pintar(); });
+  let cidPrevio = null;
+  fb.onValue(r('estado'), (s) => {
+    estado = s.val() || {};
+    if (estado.cantanteId !== cidPrevio) { cidPrevio = estado.cantanteId; escucharNotaActual(); }
+    pintar();
+  });
+}
+iniciar();
+</script>
+</body>
+</html>
