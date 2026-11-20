@@ -64,7 +64,7 @@ function pintarLogin(msg = '') {
       await fb.set(r('juradoSesion/' + j), { uid: U.uid, codigo });
       localStorage.setItem('bc_jurado', j); J = j; firma = ''; history.replaceState(null, '', 'jurados.html');
       aviso('Bienvenido, ' + ((jurados[j] && jurados[j].nombre) || j)); escucharNotaActual(); pintar();
-    } catch (err) { pintarLogin(esPermiso(err) ? 'Código incorrecto, o esa silla ya está abierta en otro celular. Si cambiaste de celular, pide a producción un código nuevo.' : 'Sin conexión, intenta de nuevo.'); }
+    } catch (err) { pintarLogin(esPermiso(err) ? 'Código incorrecto, o esa silla ya está abierta en otro celular. Si cambiaste de celular, pide a producción que libere tu silla («Liberar celular»).' : 'Sin conexión, intenta de nuevo.'); }
   };
   if (qs.get('c') && jurados[pre] && !autoIntentado) { autoIntentado = true; const f = $('#f-login'); if (f.requestSubmit) f.requestSubmit(); else f.querySelector('button').click(); }
 }

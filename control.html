@@ -649,12 +649,14 @@ function pAjustes() {
       <div class="campo"><label>Representante legal (firma el acta)</label><input id="a-rep" maxlength="80" value="${esc(cfg.repLegal || '')}"></div>
       <button class="boton">Guardar</button></form>
     <div class="tarjeta"><div class="fila"><h2 class="crece" style="margin:0">Jurados</h2><button class="boton secundario chico" id="a-jur-mas">+ Agregar jurado</button></div>
-      <p class="suave chico">Cada jurado entra con su propio enlace o QR. Si un código se filtra, genera uno nuevo.</p>
+      <p class="suave chico">Cada jurado entra con su propio enlace o QR, y su silla queda amarrada al primer celular que entra. Si hicieron pruebas o el jurado cambia de celular, pulsa <b>🔓 Liberar celular</b> (el código sigue igual). Si un código se filtra, genera uno nuevo.</p>
+      <button class="boton secundario chico" id="a-jur-liberar" style="margin-bottom:6px">🔓 Liberar los celulares de todos los jurados</button>
       ${idsJ.map((j) => `<div class="fila" style="margin:10px 0;padding:10px;background:rgba(0,0,0,.2);border-radius:12px">
         <input class="crece" data-jnombre="${j}" value="${esc(jur[j].nombre)}" style="min-width:160px">
         <span class="chip ${jurSes[j] ? 'verde' : ''}">${jurSes[j] ? 'Conectado' : 'Sin entrar'}</span>
         <code style="font-size:1.05rem;letter-spacing:.1em">${esc(jurPriv[j]?.codigo || '—')}</code>
         <button class="boton secundario chico" data-jqr="${j}">QR / enlace</button>
+        <button class="boton secundario chico" data-jlib="${j}" title="Deja entrar a este jurado desde otro celular con el MISMO código">🔓 Liberar celular</button>
         <button class="boton secundario chico" data-jcod="${j}">Nuevo código</button>
         <button class="boton secundario chico" data-jdel="${j}" title="Eliminar jurado">✕</button></div>`).join('')}
       <button class="boton chico" id="a-jur-guardar">Guardar nombres</button></div>
@@ -677,6 +679,8 @@ function pAjustes() {
   };
   $('#a-jur-guardar').onclick = async () => { const u = {}; $$('[data-jnombre]').forEach((i) => (u[i.dataset.jnombre + '/nombre'] = i.value.trim() || i.dataset.jnombre)); await fb.update(r('jurados'), u); aviso('Nombres guardados'); pAjustes(); };
   $('#a-jur-mas').onclick = async () => { let k = 1; while (jur['J' + k]) k++; const id = 'J' + k; await fb.update(r(''), { ['jurados/' + id]: { nombre: 'Jurado ' + k, orden: k }, ['juradosPriv/' + id]: { codigo: codigoNuevo() } }); pAjustes(); };
+  $$('[data-jlib]').forEach((b) => (b.onclick = async () => { const j = b.dataset.jlib; await fb.set(r('juradoSesion/' + j), null); aviso(jur[j].nombre + ' ya puede entrar desde su celular con el mismo código'); pAjustes(); }));
+  $('#a-jur-liberar').onclick = async () => { const u = {}; Object.keys(jurSes || {}).forEach((j) => (u['juradoSesion/' + j] = null)); if (Object.keys(u).length) await fb.update(r(''), u); aviso('Listo: cada jurado puede entrar de nuevo con su código'); pAjustes(); };
   $$('[data-jcod]').forEach((b) => (b.onclick = async () => { const j = b.dataset.jcod; await fb.update(r(''), { ['juradosPriv/' + j + '/codigo']: codigoNuevo(), ['juradoSesion/' + j]: null }); aviso('Código nuevo para ' + jur[j].nombre); pAjustes(); }));
   $$('[data-jdel]').forEach((b) => (b.onclick = async () => {
     if (b.dataset.ok !== '1') { b.dataset.ok = '1'; b.textContent = '¿Eliminar?'; return; }
@@ -696,7 +700,7 @@ function pAjustes() {
   }));
   $('#a-borrar-btn').onclick = async () => {
     if ($('#a-borrar').value !== 'BORRAR') return aviso('Escribe BORRAR para confirmar', 'error');
-    await fb.update(r(''), { votos: null, notas: null, cierres: null, boletas: null, historial: null, bitacora: null });
+    await fb.update(r(''), { votos: null, notas: null, cierres: null, boletas: null, historial: null, bitacora: null, ...Object.fromEntries(Object.keys(jurSes || {}).map((j) => ['juradoSesion/' + j, null])) });
     await fb.set(r('estado'), { cantanteId: '', votacion: 'CERRADA', juradoAbierto: false, sesion: codigoNuevo(8), votacionGeneral: true, presentadosV: 0 });
     await fb.set(r('presentados'), null);
     await fb.set(r('pantalla'), { modo: 'espera' });
