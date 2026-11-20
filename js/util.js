@@ -47,7 +47,8 @@ export function aviso(texto, tipo = 'ok', ms = 3200) {
 // =====================================================================
 // agregado = { votos: cantidad, suma: suma de notas } — sale del cierre o de los votos en vivo
 export function agregarVotos(votos) {
-  const lista = Object.values(votos || {}).map((v) => Number(v && v.n)).filter((n) => !Number.isNaN(n));
+  // d = decimas (85 = 8,5); n = formato anterior en enteros
+  const lista = Object.values(votos || {}).map((v) => (v && typeof v.d === 'number' ? v.d / 10 : Number(v && v.n))).filter((n) => !Number.isNaN(n));
   return { votos: lista.length, suma: lista.reduce((a, b) => a + b, 0) };
 }
 export function calcularResultado({ agregado, notas, cierre, config, jurados }) {
@@ -90,10 +91,12 @@ export function compararResultados(a, b) {
   return (v(b.final) - v(a.final)) || (v(b.promJurado) - v(a.promJurado)) || (v(b.promedio) - v(a.promedio));
 }
 
-export function htmlEncabezado() {
+// inicio = true agrega el boton «Inicio» (paginas de produccion y jurados; el publico no lo ve)
+export function htmlEncabezado({ inicio = false } = {}) {
   return `<header class="cabecera">
     <img src="img/logo.webp" alt="Brilla & Canta" class="cabecera-logo">
-    <div><div class="cabecera-titulo">${esc(EVENTO.titulo)}</div><div class="cabecera-sub">${esc(EVENTO.subtitulo)}</div></div>
+    <div style="flex:1"><div class="cabecera-titulo">${esc(EVENTO.titulo)}</div><div class="cabecera-sub">${esc(EVENTO.subtitulo)}</div></div>
+    ${inicio ? '<a class="boton secundario chico" href="index.html" title="Volver al panel inicial">⌂ Inicio</a>' : ''}
     <span id="conexion" class="punto-conexion" title="Conectando…"></span>
   </header>`;
 }
