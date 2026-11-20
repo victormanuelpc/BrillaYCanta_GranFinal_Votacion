@@ -16,7 +16,11 @@
   h1 { color: var(--oro); letter-spacing: .1em; font-size: 1.9rem; margin: 6px 0 2px; }
   .sub { font-weight: 700; margin-bottom: 24px; }
   .card .boton { margin-bottom: 10px; }
+  .bloque-admin { margin-top: 6px; padding: 14px; border-radius: 16px; background: rgba(255,255,255,.05); border: 1px solid var(--panel-borde); }
+  .bloque-admin input { width: 100%; margin-bottom: 10px; text-align: center; letter-spacing: .15em; }
+  .error { color: #ffb3b5; font-size: .9rem; }
   .nota { font-size: .8rem; color: var(--texto-suave); margin-top: 16px; }
+  .oculto { display: none; }
 </style>
 </head>
 <body>
@@ -24,12 +28,49 @@
   <img src="img/logo.webp" alt="Brilla & Canta">
   <h1>GRAN FINAL</h1>
   <div class="sub">II Festival de la Canción 2026</div>
-  <a class="boton bloque verde" href="votacion.html">📱 Público: registro y calificación</a>
-  <a class="boton bloque" href="jurados.html">⚖️ Panel de jurados</a>
-  <a class="boton bloque naranja" href="control.html">🎬 Control de producción</a>
-  <a class="boton bloque secundario" href="pantalla.html">🖥️ Pantalla de proyección</a>
-  <a class="boton bloque secundario" href="diagnostico.html">🩺 Diagnóstico de la instalación</a>
+
+  <div id="inicio">
+    <a class="boton bloque verde" href="votacion.html">📱 Público: registro y calificación</a>
+    <a class="boton bloque" href="jurados.html">⚖️ Soy jurado</a>
+    <button class="boton bloque naranja" id="btn-admin">🔐 Administración</button>
+  </div>
+
+  <form class="bloque-admin oculto" id="f-admin">
+    <b>Administración</b>
+    <p class="nota" style="margin:4px 0 10px">Ingresa el código de administrador.</p>
+    <input id="codigo" type="password" autocomplete="current-password" placeholder="Código">
+    <button class="boton bloque naranja">Entrar</button>
+    <p class="error" id="error"></p>
+    <a href="#" id="volver1" class="nota">← Volver</a>
+  </form>
+
+  <div class="oculto" id="menu-admin">
+    <a class="boton bloque naranja" href="control.html">🎬 Control de producción</a>
+    <a class="boton bloque secundario" href="pantalla.html">🖥️ Pantalla de proyección</a>
+    <a class="boton bloque" href="jurados.html">⚖️ Panel de jurados</a>
+    <a class="boton bloque secundario" href="diagnostico.html">🩺 Diagnóstico de la instalación</a>
+    <a href="#" id="volver2" class="nota">← Volver</a>
+  </div>
   <p class="nota">El QR del público apunta directamente a <b>votacion.html</b>.</p>
 </div>
+<script type="module">
+import { fb, r, sesion, ahora, esPermiso } from './js/comun.js';
+const $ = (s) => document.querySelector(s);
+const ver = (id) => ['inicio', 'f-admin', 'menu-admin'].forEach((x) => $('#' + x).classList.toggle('oculto', x !== id));
+let U = null;
+async function esAdmin() {
+  try { U = U || await sesion(); return (await fb.get(r('admins/' + U.uid))).exists(); } catch (e) { return false; }
+}
+$('#btn-admin').onclick = async () => { if (await esAdmin()) ver('menu-admin'); else { ver('f-admin'); $('#codigo').focus(); } };
+$('#volver1').onclick = $('#volver2').onclick = (e) => { e.preventDefault(); ver('inicio'); };
+$('#f-admin').onsubmit = async (e) => {
+  e.preventDefault(); $('#error').textContent = '';
+  try {
+    U = U || await sesion();
+    await fb.set(r('admins/' + U.uid), { codigo: $('#codigo').value.trim(), t: ahora() });
+    ver('menu-admin');
+  } catch (err) { $('#error').textContent = esPermiso(err) ? 'Código incorrecto.' : 'Sin conexión. Intenta de nuevo.'; }
+};
+</script>
 </body>
 </html>

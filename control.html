@@ -71,7 +71,7 @@ import { fb, r, sesion, $, $$, esc, num, pct, aviso, esPermiso, foto, pad3, ahor
   calcularResultado, agregarVotos, compararResultados, ordenarParticipantes, CATEGORIAS, URL_BASE, conIds, puestoDe, premiadosDe } from './js/comun.js';
 import { qrSVG } from './js/qr.js';
 
-$('#cab').innerHTML = htmlEncabezado();
+$('#cab').innerHTML = htmlEncabezado({ inicio: true });
 vigilarConexion($('#conexion'));
 const app = $('#app');
 
@@ -141,7 +141,7 @@ function barraPantalla() {
   return `<div class="barra-pantalla"><b style="margin-right:4px">Pantalla:</b>
     ${b('espera', '🏠 Espera / QR')}${b('escena', '🎤 En escena', estado.cantanteId ? '' : 'disabled')}
     ${b('resultado', '🏅 Resultado', estado.cantanteId ? '' : 'disabled')}
-    ${b('jurados', '⚖️ Jurados')}${m === 'jurados' ? `<button class="boton naranja chico" data-accion="sigJurado">Presentar siguiente jurado ▶</button>` : ''}
+    ${b('jurados', '⚖️ Jurados')}${m === 'jurados' ? `<button class="boton secundario chico" data-accion="antJurado" ${Number((pantalla.jurados || {}).visibles || 0) ? '' : 'disabled'}>◀ Quitar último</button><button class="boton naranja chico" data-accion="sigJurado">Presentar siguiente jurado ▶</button>` : ''}
     ${b('invitada', '⭐ Artista invitada…')}
     ${b('podio', '🏆 Podio', 'disabled title="Se lanza desde la pestaña Resultados"')}${b('mensaje', '💬 Mensaje…')}</div>`;
 }
@@ -181,7 +181,10 @@ function pVivo(estructura = false) {
   $('#vivo-actual').innerHTML = `
     <div class="actual-cab"><img src="${foto(p)}" alt=""><div>
       <div>${esActual ? '<span class="chip oro">EN ESCENA</span>' : '<span class="chip">Seleccionado</span>'} <span class="chip">${esc(p.categoria)}</span></div>
-      <h2>${esc(p.nombre)}</h2><div class="suave">${p.cancion ? '«' + esc(p.cancion) + '»' : 'Sin canción registrada'}${p.ciudad ? ' · ' + esc(p.ciudad) : ''}</div></div></div>
+      <h2>${esc(p.nombre)}</h2><div class="suave">${p.cancion ? '«' + esc(p.cancion) + '»' : 'Sin canción registrada'}${p.ciudad ? ' · ' + esc(p.ciudad) : ''}</div>
+      <div style="margin-top:8px">${p.ausente
+        ? '<span class="chip rojo">NO SE PRESENTÓ</span> <button class="boton secundario chico" data-accion="siAsistio">↩ Sí se presentó</button>'
+        : `<button class="boton secundario chico" data-accion="noAsistio">${confirmarAusente.cid === cid && Date.now() - confirmarAusente.t < 6000 ? '¿Confirmas? Pulsa de nuevo' : '🚫 No se presentó'}</button>`}</div></div></div>
     <div class="pasos">
       <div class="paso ${esActual ? 'hecho' : ''}"><span class="num">1</span><div><div class="t">Poner en escena</div><div class="d">Aparece en la pantalla y los jurados pueden calificar.</div></div>
         <button class="boton chico" data-accion="escena" ${esActual ? 'disabled' : ''}>${esActual ? 'En escena' : 'Poner en escena'}</button></div>
@@ -199,8 +202,9 @@ function pVivo(estructura = false) {
         ${enResultado && !pantalla.soloPublico ? `<div class="jur" style="margin-top:8px">
           <button class="boton chico ${rev.publico ? 'secundario' : ''}" data-rev="publico">${rev.publico ? '✓ ' : ''}Público</button>
           ${idsJ.map((j) => `<button class="boton chico ${rev[j] ? 'secundario' : ''}" data-rev="${j}" ${R.notasJ[j] === null ? 'disabled' : ''}>${rev[j] ? '✓ ' : ''}${esc(jur[j].nombre)}</button>`).join('')}
-          <button class="boton naranja chico" data-rev="final" ${rev.final ? 'disabled' : ''}>${rev.final ? '✓ ' : ''}Nota final</button>
-          <button class="boton secundario chico" data-rev="todo">Revelar todo</button></div>` : ''}</div>
+          <button class="boton naranja chico ${rev.final ? 'secundario' : ''}" data-rev="final">${rev.final ? '✓ ' : ''}Nota final</button>
+          <button class="boton secundario chico" data-rev="todo">${rev.publico && rev.final && idsJ.every((j) => rev[j] || R.notasJ[j] === null) ? 'Ocultar todo' : 'Revelar todo'}</button></div>
+          <div class="suave chico" style="margin-top:4px">Toca un botón marcado con ✓ para volver a ocultarlo.</div>` : ''}</div>
         <button class="boton chico" data-accion="resultadoPublico" ${esActual || cierres[cid] ? '' : 'disabled'}>${enResultado ? 'En pantalla' : 'Mostrar nota del público'}</button></div>
     </div>
     <div class="kpis">
@@ -226,6 +230,14 @@ async function manejarClicVivo(e) {
     if (a === 'abrirJurado') await fb.update(r('estado'), { juradoAbierto: true });
     if (a === 'resultado') await mostrarResultado(cid, false);
     if (a === 'resultadoPublico') await mostrarResultado(cid, true);
+    if (a === 'antJurado') await fb.update(r('pantalla/jurados'), { visibles: Math.max(0, Number((pantalla.jurados || {}).visibles || 0) - 1) });
+    if (a === 'noAsistio' || a === 'siAsistio') {
+      if (a === 'noAsistio' && !(confirmarAusente.cid === cid && Date.now() - confirmarAusente.t < 6000)) { confirmarAusente = { cid, t: Date.now() }; pintar(); setTimeout(pintar, 6100); return; }
+      confirmarAusente = {};
+      await fb.update(r('participantes/' + cid), { ausente: a === 'noAsistio' ? true : null });
+      bitacora(`${a === 'noAsistio' ? 'No se presentó' : 'Se marcó de nuevo como presente'}: ${part[cid].nombreCompleto || part[cid].nombre} (${part[cid].categoria})`);
+      aviso(a === 'noAsistio' ? 'Marcado: no se presentó' : 'Marcado de nuevo como presente');
+    }
     if (a === 'sigJurado') {
       const n = Math.min(Object.keys(jur).length, Number((pantalla.jurados || {}).visibles || 0) + 1);
       await fb.update(r('pantalla/jurados'), { visibles: n });
@@ -233,8 +245,13 @@ async function manejarClicVivo(e) {
     }
     if (t.dataset.rev) {
       const k = t.dataset.rev;
-      if (k === 'todo') { const o = { publico: true, final: true }; Object.keys(jur).forEach((j) => (o[j] = true)); await fb.update(r('pantalla/revelado'), o); }
-      else await fb.update(r('pantalla/revelado'), { [k]: true });
+      const rv = pantalla.revelado || {};
+      if (k === 'todo') {
+        const R0 = resultadoDe(pantalla.cid || estado.cantanteId);
+        const todo = rv.publico && rv.final && Object.keys(jur).every((j) => rv[j] || R0.notasJ[j] === null);
+        const o = { publico: !todo, final: !todo }; Object.keys(jur).forEach((j) => (o[j] = !todo));
+        await fb.update(r('pantalla/revelado'), o);
+      } else await fb.update(r('pantalla/revelado'), { [k]: !rv[k] });   // revelar / ocultar
       sincronizarPantalla(0);
     }
   } catch (err) { aviso('No se pudo: ' + (esPermiso(err) ? 'sin permiso' : 'sin conexión'), 'error'); }
@@ -250,6 +267,7 @@ async function ponerEnEscena(cid) {
 }
 // ---- cuenta regresiva: avisa al publico (pantalla y celulares) antes de cerrar ----
 let cuentaTimer = null;
+let confirmarAusente = {};   // doble pulsacion para «No se presentó»
 const segCuenta = () => Math.max(3, Math.min(60, Number(cfg.cuentaSeg) || 15));
 function pararCuenta() { clearInterval(cuentaTimer); cuentaTimer = null; }
 function iniciarCuenta() {
@@ -384,8 +402,8 @@ function sincronizarPantalla(espera = 700) {
 // =====================================================================
 function tablaCategoria(cat) {
   const lista = partLista().filter((p) => p.categoria === cat).map((p) => ({ p, ...resultadoDe(p.id) }));
-  const calificados = lista.filter((x) => cierres[x.p.id] || x.juradosRecibidos).sort(compararResultados);
-  const sin = lista.filter((x) => !(cierres[x.p.id] || x.juradosRecibidos));
+  const calificados = lista.filter((x) => !x.p.ausente && (cierres[x.p.id] || x.juradosRecibidos)).sort(compararResultados);
+  const sin = lista.filter((x) => !calificados.includes(x));
   const idsJ = Object.keys(jur).sort();
   const fila = (x, i) => { const pu = puestoDe(cat, i); return `<tr class="${pu ? 'top' : ''}"><td>${i === null ? '' : pu ? `<b>${pu}.º</b>` : i + 1}</td><td>${esc(x.p.nombre)}</td>
     <td class="n">${x.nVotos}</td><td class="n">${num(x.promedio, 2)}</td>
@@ -393,8 +411,8 @@ function tablaCategoria(cat) {
     <td class="n">${num(x.promJurado, 2)}</td><td class="n"><b>${num(x.final, 2)}</b></td><td>${x.completo ? '<span class="chip verde">OK</span>' : '<span class="chip">parcial</span>'}</td></tr>`; };
   return { calificados, html: `<div class="tarjeta"><div class="fila"><h2 class="crece" style="margin:0">${esc(cat)}</h2>
       <button class="boton chico" data-podio="${esc(cat)}" ${calificados.length ? '' : 'disabled'}>Mostrar podio en pantalla</button>
-      ${pantalla.modo === 'podio' && pantalla.podio?.categoria === cat ? `<button class="boton naranja chico" data-podio-rev="1" ${siguientePodio() ? '' : 'disabled'}>${siguientePodio() ? `Revelar ${siguientePodio().puesto}.º puesto · ${esc(siguientePodio().nombre)}` : 'Todos revelados'}</button>` : ''}</div>
-    <div class="envoltura-tabla" style="margin-top:10px"><table class="tabla"><tr><th>Puesto</th><th>Participante</th><th class="n">Votos</th><th class="n">Público (J5)</th>
+      ${pantalla.modo === 'podio' && pantalla.podio?.categoria === cat ? `<button class="boton secundario chico" data-podio-ocultar="1" ${(pantalla.podio.revelados || 0) ? '' : 'disabled'}>◀ Ocultar último</button><button class="boton naranja chico" data-podio-rev="1" ${siguientePodio() ? '' : 'disabled'}>${siguientePodio() ? `Revelar ${siguientePodio().puesto}.º puesto · ${esc(siguientePodio().nombre)}` : 'Todos revelados'}</button>` : ''}</div>
+    <div class="envoltura-tabla" style="margin-top:10px"><table class="tabla"><tr><th>Puesto</th><th>Participante</th><th class="n">Votos</th><th class="n">J5 (público)</th>
       ${idsJ.map((j) => `<th class="n">${esc(jur[j].nombre)}</th>`).join('')}<th class="n">Jurado</th><th class="n">Final</th><th></th></tr>
       ${calificados.map((x, i) => fila(x, i)).join('')}${sin.map((x) => fila(x, null)).join('')}</table></div></div>` };
 }
@@ -416,6 +434,7 @@ function pResultados() {
     bitacora('Podio en pantalla: ' + cat);
     await fb.update(r('pantalla'), { modo: 'podio', podio: { categoria: cat, lista: top, revelados: 0 } });
   }));
+  const po = $('[data-podio-ocultar]'); if (po) po.onclick = () => fb.update(r('pantalla/podio'), { revelados: Math.max(0, (pantalla.podio.revelados || 0) - 1) });
   const rv = $('[data-podio-rev]'); if (rv) rv.onclick = () => { const n = Object.keys(pantalla.podio?.lista || {}).length; fb.update(r('pantalla/podio'), { revelados: Math.min(n, (pantalla.podio.revelados || 0) + 1) }); };
 }
 function exportarCSV() {
@@ -456,7 +475,7 @@ function generarInforme() {
   const peso = cfg.pesoPublico == null ? 30 : cfg.pesoPublico;
   const j5 = peso === 20;
   const etJ = (j) => `J${jur[j].orden || ''}<br><small>${esc(jur[j].nombre)}</small>`;
-  const etP = j5 ? 'J5<br><small>Público</small>' : 'Público';
+  const etP = j5 ? 'J5' : 'Público';
   const cats = CATEGORIAS.map((cat) => {
     const { calificados } = tablaCategoria(cat);
     return { cat, filas: calificados.map((x, i) => ({ ...x, pos: i + 1, puesto: puestoDe(cat, i) })), noPres: todos.filter((p) => p.categoria === cat && !calificados.find((x) => x.p.id === p.id)) };
@@ -644,10 +663,10 @@ function pAjustes() {
       <div class="fila"><input id="a-borrar" placeholder='Escribe BORRAR' style="max-width:200px"><button class="boton rojo chico" id="a-borrar-btn">Borrar datos del ensayo</button></div>
       <button class="boton secundario chico" id="a-respaldo" style="margin-top:12px">⬇ Descargar respaldo completo (JSON)</button></div>
     </div>
-    <div class="tarjeta"><h2>Participantes</h2><p class="suave chico">Corrige nombres o agrega la canción y la ciudad. Los cambios se ven al instante en todas las pantallas.</p>
-      <div class="envoltura-tabla"><table class="tabla"><tr><th></th><th>Nombre</th><th>Canción</th><th>Ciudad</th><th>Orden</th><th></th></tr>
+    <div class="tarjeta"><h2>Participantes</h2><p class="suave chico"><b>Nombre en pantalla</b>: el nombre artístico que se ve en la proyección y en los celulares. El <b>nombre oficial</b> (del Excel) no cambia: es el que sale en el acta, el informe y los documentos.</p>
+      <div class="envoltura-tabla"><table class="tabla"><tr><th></th><th>Nombre en pantalla</th><th>Nombre oficial (acta)</th><th>Canción</th><th>Ciudad</th><th>Orden</th><th></th></tr>
       ${partLista().map((p) => `<tr data-pid="${p.id}"><td><img src="${foto(p, true)}" style="width:34px;border-radius:6px" alt=""></td>
-        <td><input data-c="nombre" value="${esc(p.nombre)}"></td><td><input data-c="cancion" value="${esc(p.cancion || '')}"></td>
+        <td><input data-c="nombre" value="${esc(p.nombre)}"></td><td class="suave chico">${esc(p.nombreCompleto || '')}</td><td><input data-c="cancion" value="${esc(p.cancion || '')}"></td>
         <td><input data-c="ciudad" value="${esc(p.ciudad || '')}" style="width:120px"></td><td><input data-c="orden" type="number" value="${p.orden}" style="width:70px"></td>
         <td><button class="boton secundario chico" data-guardar-p="${p.id}">Guardar</button></td></tr>`).join('')}</table></div></div></div>`;
   app.onclick = null;

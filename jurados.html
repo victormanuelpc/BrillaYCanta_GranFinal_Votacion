@@ -36,7 +36,7 @@
 </script>
 <script type="module">
 import { fb, r, sesion, $, esc, aviso, esPermiso, foto, num, htmlEncabezado, vigilarConexion, ahora, conIds } from './js/comun.js';
-$('#cab').innerHTML = htmlEncabezado();
+$('#cab').innerHTML = htmlEncabezado({ inicio: true });
 vigilarConexion($('#conexion'));
 const app = $('#app');
 const qs = new URLSearchParams(location.search);

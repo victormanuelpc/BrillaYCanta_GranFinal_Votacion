@@ -40,6 +40,11 @@
   .pendientes .pend img { width: 44px; height: 54px; object-fit: cover; border-radius: 8px; }
   .pendientes .pend > span:nth-child(2) { flex: 1; }
   .pendientes .ir { color: var(--oro, #f5c451); font-weight: 800; white-space: nowrap; }
+  .decimas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 0 0 10px; }
+  .nota.dec { font-size: 1.05rem; aspect-ratio: auto; padding: 10px 0; }
+  .nota:disabled { opacity: .3; }
+  .mi-nota { text-align: center; margin: 4px 0 12px; color: var(--texto-suave); }
+  .mi-nota b { font-size: 1.8rem; color: var(--oro, #f5c451); }
   .en-escena { display: flex; gap: 12px; align-items: center; text-align: left; background: rgba(0,0,0,.25); border-radius: 14px; padding: 10px; margin-top: 12px; }
   .en-escena img { width: 64px; border-radius: 10px; }
   .intro { display: flex; gap: 12px; align-items: center; background: linear-gradient(135deg, rgba(245,196,81,.2), rgba(255,122,26,.15)); border: 1px solid rgba(245,196,81,.35); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; }
@@ -235,16 +240,24 @@ function pintar() {
         <img class="foto" src="${foto(q)}" alt="${esc(q.nombre)}">
         <h2>${esc(q.nombre)}</h2>
         <div class="suave">${esc(q.categoria)}${q.cancion ? ' · «' + esc(q.cancion) + '»' : ''}</div>
-        <p style="margin:16px 0 0;font-weight:700">¿Qué nota le das? <span class="suave">(0 a 10)</span></p>
-        <div class="notas">${[0,1,2,3,4,5,6,7,8,9,10].map((n) => `<button class="nota${n === 10 ? ' diez' : ''}" data-n="${n}">${n}</button>`).join('')}</div>
+        <p style="margin:16px 0 0;font-weight:700">¿Qué nota le das? <span class="suave">(0,0 a 10,0)</span></p>
+        <div class="notas" id="enteros">${[0,1,2,3,4,5,6,7,8,9,10].map((n) => `<button class="nota${n === 10 ? ' diez' : ''}" data-e="${n}">${n}</button>`).join('')}</div>
+        <div class="decimas" id="decimas">${[0,1,2,3,4,5,6,7,8,9].map((d) => `<button class="nota dec" data-d="${d}">,${d}</button>`).join('')}</div>
+        <div class="mi-nota" id="mi-nota">Elige el número entero y luego el decimal</div>
         <button class="boton bloque verde" id="enviar" disabled>Enviar calificación</button>
       </section>`;
+  // seleccion = nota en decimas (0 a 100); entero y decima se eligen por separado
   const activarVoto = (qid) => {
-    document.querySelectorAll('.nota').forEach((b) => {
-      if (Number(b.dataset.n) === seleccion) b.classList.add('elegida');
-      b.onclick = () => { seleccion = Number(b.dataset.n); document.querySelectorAll('.nota').forEach((x) => x.classList.toggle('elegida', x === b)); $('#enviar').disabled = false; };
-    });
-    $('#enviar').disabled = seleccion === null;
+    const refrescar = () => {
+      const e = seleccion === null ? null : Math.floor(seleccion / 10), d = seleccion === null ? null : seleccion % 10;
+      document.querySelectorAll('#enteros .nota').forEach((b) => b.classList.toggle('elegida', Number(b.dataset.e) === e));
+      document.querySelectorAll('#decimas .nota').forEach((b) => { b.classList.toggle('elegida', seleccion !== null && Number(b.dataset.d) === d); b.disabled = seleccion === null || (e === 10 && Number(b.dataset.d) > 0); });
+      $('#mi-nota').innerHTML = seleccion === null ? 'Elige el número entero y luego el decimal' : `Tu nota: <b>${fmt(seleccion)}</b>`;
+      $('#enviar').disabled = seleccion === null;
+    };
+    document.querySelectorAll('#enteros .nota').forEach((b) => (b.onclick = () => { const e = Number(b.dataset.e); const d = seleccion === null || e === 10 ? 0 : seleccion % 10; seleccion = e * 10 + d; refrescar(); }));
+    document.querySelectorAll('#decimas .nota').forEach((b) => (b.onclick = () => { if (seleccion === null) return; seleccion = Math.floor(seleccion / 10) * 10 + Number(b.dataset.d); if (seleccion > 100) seleccion = 100; refrescar(); }));
+    refrescar();
     $('#enviar').onclick = () => enviarVoto(qid);
   };
   if (abierta && !yaVoto) {
@@ -267,7 +280,7 @@ function pintar() {
 // Participantes que ya cantaron y que esta boleta todavia no califica (votacion general abierta)
 function pendientes(excluir) {
   if (estado.votacionGeneral !== true) return [];
-  return Object.keys(presentados).filter((id) => participantes[id] && misVotos[id] === undefined && id !== excluir)
+  return Object.keys(presentados).filter((id) => participantes[id] && !participantes[id].ausente && misVotos[id] === undefined && id !== excluir)
     .sort((a, b) => (participantes[a].catOrden - participantes[b].catOrden) || (participantes[a].orden - participantes[b].orden));
 }
 function tarjetaPendientes(pend) {
@@ -282,14 +295,15 @@ function otraBoleta() {
   reg = null; misVotos = {}; local.set('bc_registro', null); local.set('bc_votos', {});
   borrador.num = ''; pantallaRegistro = 'form'; firma = ''; pintar();
 }
+const fmt = (d) => (d / 10).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 async function enviarVoto(cid) {
   if (enviando || seleccion === null) return;
-  const n = seleccion;
+  const d = seleccion;
   enviando = true; firma = ''; pintar();
   try {
-    await conReintentos(() => guardar(`votos/${cid}/${reg.num}`, { n, k: reg.k, t: TS }),
+    await conReintentos(() => guardar(`votos/${cid}/${reg.num}`, { d, k: reg.k, t: TS }),
       { alReintentar: () => { const t = $('#txt-enviando'); if (t) t.innerHTML = '<b style="color:var(--oro)">Señal débil:</b> seguimos intentando. No cierres esta página.'; } });
-    misVotos[cid] = n; local.set('bc_votos', misVotos);
+    misVotos[cid] = fmt(d); local.set('bc_votos', misVotos);
     if (objetivo === cid) objetivo = null;
     seleccion = null;
     aviso('¡Calificación enviada!');

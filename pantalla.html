@@ -122,7 +122,7 @@
   <section class="vista" id="v-jurados"></section>
   <section class="vista" id="v-invitada"></section>
 </div>
-<button class="boton secundario chico" id="pantalla-completa">⛶ Pantalla completa (F)</button>
+<div id="pantalla-completa"><a class="boton secundario chico" href="index.html">⌂ Inicio</a> <button class="boton secundario chico" id="btn-completa">⛶ Pantalla completa (F)</button></div>
 
 <script type="module">
 import { fb, r, $, esc, num, pct, foto, URL_BASE, EVENTO, sesion, conIds } from './js/comun.js';
@@ -135,7 +135,7 @@ function ajustar() {
 }
 addEventListener('resize', ajustar); ajustar();
 const completa = () => document.documentElement.requestFullscreen?.().catch(() => {});
-$('#pantalla-completa').onclick = completa;
+$('#btn-completa').onclick = completa;
 addEventListener('keydown', (e) => { if (e.key === 'f' || e.key === 'F') completa(); });
 document.addEventListener('fullscreenchange', () => document.body.classList.toggle('en-completa', !!document.fullscreenElement));
 
@@ -173,11 +173,11 @@ function vEscena() {
           ${v.abierta ? `<div class="qr">${qrSVG(URL_VOTO, { borde: 2 })}</div>` : ''}
           <div><div class="${v.abierta ? 'vota-ya' : 'dato-vivo'}">${v.abierta ? '¡CALIFICA AHORA!' : 'Votación del público cerrada'}</div>
             ${enCuenta ? '<div class="cuenta">La votación se cierra en <b id="cuenta-n"></b></div>' : ''}
-            <div class="dato-vivo" id="dato-vivo" style="margin-top:14px"></div></div>
+            </div>
         </div></div></div>`;
   }
   const cn = $('#cuenta-n'); if (cn && cn.textContent !== String(v.quedan)) { cn.textContent = v.quedan; cn.classList.remove('late'); void cn.offsetWidth; cn.classList.add('late'); }
-  const d = $('#dato-vivo'); if (d) d.textContent = `${(v.votos || 0).toLocaleString('es-CO')} ${v.votos === 1 ? 'voto' : 'votos'} del público`;
+  // la cantidad de votos no se muestra al público
 }
 function vResultado() {
   const p = participantes[P.cid]; if (!p) return;
@@ -192,14 +192,14 @@ function vResultado() {
       <div><span class="categoria">${esc(p.categoria)}</span><div class="nombre-grande" style="--tam:${tamNombre(p.nombre, 96)};margin:16px 0 10px">${esc(p.nombre)}</div>
       <div class="solo-publico"><div class="t">CALIFICACIÓN DEL PÚBLICO</div>
         <div class="v">${pub.nota === null || pub.nota === undefined ? '—' : num(pub.nota, 2)}</div>
-        <div class="d">${R.parcial ? 'Nota parcial · ' : ''}Promedio de ${Number(pub.votos || 0).toLocaleString('es-CO')} ${pub.votos === 1 ? 'voto' : 'votos'}${R.parcial ? ' · Puede cambiar hasta el cierre de las votaciones' : ''} · La nota de los jurados se conocerá en la premiación</div></div>
+        <div class="d">${R.parcial ? 'Nota parcial · Puede cambiar hasta el cierre de las votaciones · ' : ''}La nota de los jurados se conocerá en la premiación</div></div>
       </div></div>`;
     if (cambio('resultado', h)) $('#v-resultado').innerHTML = h;
     return;
   }
   const html = `<div class="resultado"><img class="foto-grande" src="${foto(p)}" alt="">
     <div><span class="categoria">${esc(p.categoria)}</span><div class="nombre-grande" style="--tam:${tamNombre(p.nombre, 76)};margin:14px 0 18px">${esc(p.nombre)}</div>
-    ${fila('Público', rev.publico ? `Promedio de ${Number(pub.votos || 0).toLocaleString('es-CO')} ${pub.votos === 1 ? 'voto' : 'votos'}` : 'Calificación del público', pub.nota, !!rev.publico, 'publico')}
+    ${fila('Público (J5)', 'Calificación del público', pub.nota, !!rev.publico, 'publico')}
     ${Object.values(R.jurados || {}).map((j) => fila(esc(j.nombre), '', j.nota, j.nota !== null && j.nota !== undefined, j.id)).join('')}
     <div class="final"><div class="quien">NOTA FINAL</div><div class="valor ${rev.final ? 'revelado' : 'tapado'}">${rev.final ? num(R.final, 2) : '?'}</div></div>
     </div></div>`;
