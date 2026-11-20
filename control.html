@@ -665,7 +665,7 @@ function pAjustes() {
     </div>
     <div class="tarjeta"><h2>Participantes</h2><p class="suave chico"><b>Nombre en pantalla</b>: el nombre artístico que se ve en la proyección y en los celulares. El <b>nombre oficial</b> (del Excel) no cambia: es el que sale en el acta, el informe y los documentos.</p>
       <div class="envoltura-tabla"><table class="tabla"><tr><th></th><th>Nombre en pantalla</th><th>Nombre oficial (acta)</th><th>Canción</th><th>Ciudad</th><th>Orden</th><th></th></tr>
-      ${partLista().map((p) => `<tr data-pid="${p.id}"><td><img src="${foto(p, true)}" style="width:34px;border-radius:6px" alt=""></td>
+      ${partLista().map((p) => `<tr data-pid="${p.id}"><td style="width:46px"><img src="${foto(p, true)}" style="width:34px;min-width:34px;max-width:none;height:auto;border-radius:6px" alt=""></td>
         <td><input data-c="nombre" value="${esc(p.nombre)}"></td><td class="suave chico">${esc(p.nombreCompleto || '')}</td><td><input data-c="cancion" value="${esc(p.cancion || '')}"></td>
         <td><input data-c="ciudad" value="${esc(p.ciudad || '')}" style="width:120px"></td><td><input data-c="orden" type="number" value="${p.orden}" style="width:70px"></td>
         <td><button class="boton secundario chico" data-guardar-p="${p.id}">Guardar</button></td></tr>`).join('')}</table></div></div></div>`;
