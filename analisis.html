@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#12051d">
+<meta name="robots" content="noindex">
+<title>Análisis de votaciones · Brilla & Canta</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  :root {
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --seq: #5598e7;
+    --div-neg: #e0524f; --div-mid: #3a3540; --div-pos: #3d8be8;
+    --grid: rgba(255,255,255,.10); --eje: rgba(255,255,255,.35);
+  }
+  .barra-acciones { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi { background: rgba(0,0,0,.22); border-radius: 14px; padding: 12px 14px; }
+  .kpi b { display: block; font: 800 1.7rem var(--display); color: var(--oro); font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .kpi span { font-size: .8rem; color: var(--texto-suave); }
+  .clave { background: rgba(245,196,81,.08); border: 1px solid rgba(245,196,81,.35); border-radius: 14px; padding: 14px 16px; margin: 12px 0 0; }
+  .clave b.grande { font: 800 1.5rem var(--display); color: var(--oro); }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 860px) { .dos { grid-template-columns: 1fr; } }
+  .multiples { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+  .multiples .panel { background: rgba(0,0,0,.18); border-radius: 12px; padding: 10px 10px 4px; }
+  .multiples h4 { margin: 0 0 2px; font: 700 .9rem var(--display); }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  svg text { fill: var(--texto-suave); font: 11px var(--cuerpo); }
+  svg .val { fill: var(--texto); font-weight: 600; }
+  table.tabla { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .tabla th { text-align: left; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--texto-suave); padding: 8px 6px; border-bottom: 1px solid var(--panel-borde); position: sticky; top: 0; background: #1a0829; z-index: 1; }
+  .tabla td { padding: 7px 6px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: middle; }
+  .envoltura-tabla { overflow: auto; max-height: 75vh; max-width: 100%; }
+  .tarjeta { min-width: 0; }
+  .tabla td.n, .tabla th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tabla td.pocos { color: rgba(255,255,255,.35); }
+  .tabla tr.cat td { background: rgba(245,196,81,.10); color: var(--oro); font: 800 .78rem var(--display); letter-spacing: .08em; text-transform: uppercase; }
+  .sube { color: #7fb8ff; } .baja { color: #ff8a8a; }
+  .etq { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: rgba(255,255,255,.1); white-space: nowrap; }
+  .etq.alerta { background: rgba(224,82,79,.22); color: #ffb3b1; }
+  .matriz { border-collapse: separate; border-spacing: 2px; font-size: .78rem; }
+  .matriz th { font-weight: 600; color: var(--texto-suave); padding: 2px 4px; white-space: nowrap; }
+  .matriz th.col { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; height: 120px; vertical-align: bottom; }
+  .matriz th.fila { text-align: right; max-width: 170px; overflow: hidden; text-overflow: ellipsis; }
+  .matriz td { width: 38px; min-width: 38px; height: 30px; text-align: center; border-radius: 4px; font-variant-numeric: tabular-nums; color: #fff; cursor: default; }
+  .matriz td.diag { outline: 2px solid var(--oro); outline-offset: -2px; }
+  .matriz td.vacio { background: transparent; color: rgba(255,255,255,.25); }
+  .leyenda { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: .8rem; color: var(--texto-suave); margin: 6px 0; }
+  .leyenda i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .leyenda .rampa { width: 160px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, var(--div-neg), var(--div-mid), var(--div-pos)); }
+  .tip { position: fixed; z-index: 50; pointer-events: none; background: #1d1027; border: 1px solid var(--panel-borde); border-radius: 10px; padding: 8px 10px; font-size: .8rem; box-shadow: var(--sombra); max-width: 280px; }
+  .tip div { display: flex; justify-content: space-between; gap: 14px; }
+  .tip strong { font-variant-numeric: tabular-nums; }
+  .tip .t { font-weight: 700; margin-bottom: 4px; display: block; }
+  .ajustes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
+  details summary { cursor: pointer; color: var(--oro); font-weight: 700; }
+  .nota-metodo { font-size: .85rem; color: var(--texto-suave); }
+  .nota-metodo li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div id="cab"></div>
+<main class="contenedor ancho" id="app"></main>
+<div id="tip" class="tip oculto"></div>
+<script type="module">
+import { $, $$, esc, num, htmlEncabezado, CATEGORIAS, calcularResultado, compararResultados, puestoDe, aviso, ordenarParticipantes, pad3 } from './js/util.js';
+
+$('#cab').innerHTML = htmlEncabezado({ inicio: true });
+$('#conexion').classList.add('oculto');
+const app = $('#app');
+
+// =====================================================================
+//  DATOS: en vivo (Firebase, con código de administrador) o desde un respaldo .json
+// =====================================================================
+let D = null;          // { participantes, boletas, votos, historial, notas, jurados, config, fecha, origen }
+let C = null, U = null; // modulo de Firebase y usuario (solo modo en vivo)
+const RUTAS = ['participantes', 'boletas', 'votos', 'historial', 'notas', 'jurados', 'config'];
+const opc = { alto: 9, bajo: 3, llamado: '', nombres: false };
+
+function pintarInicio(msg = '') {
+  app.innerHTML = `<div class="tarjeta" style="max-width:640px;margin:24px auto">
+    <h2>📊 Análisis de votaciones del público</h2>
+    <p class="suave">Estudia cómo votaron los asistentes: si apoyaron solo a su finalista, si fueron solidarios con todos o si castigaron a los rivales de su misma categoría. No cambia nada en la pantalla ni en los celulares.</p>
+    <form id="f-login"><div class="campo"><label for="codigo">Código de administrador</label><input id="codigo" type="password" autocomplete="current-password" placeholder="Código"></div>
+    <button class="boton bloque">Analizar los datos en vivo</button></form>
+    ${msg ? `<p style="color:#ffb3b5">${esc(msg)}</p>` : ''}
+    <p class="suave chico centro" style="margin:14px 0 6px">— o, sin internet ni código —</p>
+    <label class="boton bloque secundario" for="archivo" style="text-align:center;cursor:pointer;color:var(--texto)">📂 Abrir un respaldo (.json)</label>
+    <input id="archivo" type="file" accept=".json,application/json" class="oculto">
+  </div>`;
+  $('#f-login').onsubmit = async (e) => { e.preventDefault(); await conectar($('#codigo').value.trim()); };
+  $('#archivo').onchange = (e) => abrirRespaldo(e.target.files[0]);
+}
+
+async function conectar(codigo) {
+  app.innerHTML = '<div class="tarjeta centro suave">Conectando…</div>';
+  try {
+    C = C || await import('./js/comun.js');
+    U = U || await C.sesion();
+    const ya = await C.fb.get(C.r('admins/' + U.uid)).then((s) => s.exists()).catch(() => false);
+    if (!ya) {
+      if (!codigo) return pintarInicio();
+      try { await C.fb.set(C.r('admins/' + U.uid), { codigo, t: C.ahora() }); }
+      catch (err) { return pintarInicio(C.esPermiso(err) ? 'Código incorrecto.' : 'Sin conexión.'); }
+    }
+    await cargarEnVivo();
+  } catch (e) { console.error(e); pintarInicio('No se pudo conectar con Firebase. Revisa internet.'); }
+}
+async function cargarEnVivo() {
+  app.innerHTML = '<div class="tarjeta centro suave">Leyendo votaciones…</div>';
+  const vals = await Promise.all(RUTAS.map((p) => C.fb.get(C.r(p)).then((s) => s.val() || {})));
+  D = Object.fromEntries(RUTAS.map((p, i) => [p, vals[i]]));
+  D.fecha = new Date().toISOString(); D.origen = 'vivo';
+  pintarTablero();
+}
+function abrirRespaldo(f) {
+  if (!f) return;
+  const lr = new FileReader();
+  lr.onload = () => {
+    try {
+      const j = JSON.parse(String(lr.result).replace(/^﻿/, ''));
+      if (!j.participantes || !j.votos) throw new Error('El archivo no trae participantes y votos');
+      D = { ...Object.fromEntries(RUTAS.map((p) => [p, j[p] || {}])), fecha: j.fecha || '', origen: 'archivo', archivo: f.name };
+      pintarTablero();
+    } catch (e) { pintarInicio('Ese archivo no es un respaldo válido de la Gran Final (' + e.message + ').'); }
+  };
+  lr.readAsText(f);
+}
+
+// =====================================================================
+//  ESTADISTICA
+// =====================================================================
+const media = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+const mediana = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const desv = (a) => { if (a.length < 2) return null; const m = media(a); return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / (a.length - 1)); };
+const proporcion = (a, f) => (a.length ? a.filter(f).length / a.length : null);
+const dif = (a, b) => (a == null || b == null ? null : a - b);
+const REL = { propio: 'A su finalista', rival: 'A rivales directos', otra: 'A otras categorías', sin: 'Boletas sin finalista' };
+const PERFILES = [
+  ['castigo', 'Castigo a rivales', 'Le dio a su finalista la nota alta o más y a por lo menos un rival directo la nota baja o menos.'],
+  ['solo', 'Solo votó por su finalista', 'No calificó a nadie más.'],
+  ['solidario', 'Solidario', 'Calificó a dos o más participantes y nunca puso menos de 7,0.'],
+  ['exigente', 'Exigente', 'Promedio por debajo de 6,0 sin el patrón de castigo.'],
+  ['mixto', 'Mixto', 'Todos los demás.'],
+  ['sinvoto', 'Se registró y no votó', 'Boleta registrada sin ninguna calificación.'],
+];
+const horaDe = (t) => (t ? new Date(t).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+
+function analizar() {
+  const part = {};
+  ordenarParticipantes(D.participantes).forEach((p) => (part[p.id] = p));
+  const cat = (cid) => (part[cid] ? part[cid].categoria : null);
+  const historial = D.historial || {};
+
+  // ---- cada voto con su contexto ----
+  const votos = [];
+  for (const [cid, vs] of Object.entries(D.votos || {})) {
+    if (!part[cid]) continue;
+    for (const [nb, v] of Object.entries(vs || {})) {
+      const nota = v && typeof v.d === 'number' ? v.d / 10 : Number(v && v.n);
+      if (Number.isNaN(nota)) continue;
+      const bol = (D.boletas || {})[nb] || {};
+      const barra = bol.finalista && (bol.finalista === 'NINGUNO' || part[bol.finalista]) ? bol.finalista : 'NINGUNO';
+      const rel = barra === 'NINGUNO' ? 'sin' : barra === cid ? 'propio' : cat(barra) === cat(cid) ? 'rival' : 'otra';
+      const h = historial[cid] || {};
+      const momento = h.cierre && v.t ? (v.t > h.cierre + 2500 ? 'tardio' : 'vivo') : 'vivo';
+      votos.push({ boleta: nb, cid, cat: cat(cid), nota, t: v.t || null, barra, barraCat: barra === 'NINGUNO' ? '' : cat(barra), rel, momento, nombreAsistente: bol.nombre || '' });
+    }
+  }
+  const notasDe = (f) => votos.filter(f).map((v) => v.nota);
+
+  // ---- por boleta ----
+  const porBoleta = {};
+  for (const [nb, b] of Object.entries(D.boletas || {})) porBoleta[nb] = { boleta: nb, barra: b.finalista && (b.finalista === 'NINGUNO' || part[b.finalista]) ? b.finalista : 'NINGUNO', nombre: b.nombre || '', votos: [] };
+  votos.forEach((v) => { (porBoleta[v.boleta] = porBoleta[v.boleta] || { boleta: v.boleta, barra: v.barra, nombre: '', votos: [] }).votos.push(v); });
+  const boletas = Object.values(porBoleta).sort((a, b) => a.boleta.localeCompare(b.boleta)).map((b) => {
+    const todas = b.votos.map((v) => v.nota);
+    const propio = b.votos.find((v) => v.rel === 'propio');
+    const riv = b.votos.filter((v) => v.rel === 'rival').map((v) => v.nota);
+    const otr = b.votos.filter((v) => v.rel === 'otra').map((v) => v.nota);
+    const castigados = riv.filter((n) => n <= opc.bajo).length;
+    const m = media(todas);
+    let perfil;
+    if (!todas.length) perfil = 'sinvoto';
+    else if (propio && propio.nota >= opc.alto && castigados > 0) perfil = 'castigo';
+    else if (todas.length === 1 && propio) perfil = 'solo';
+    else if (todas.length >= 2 && Math.min(...todas) >= 7) perfil = 'solidario';
+    else if (m < 6) perfil = 'exigente';
+    else perfil = 'mixto';
+    return { ...b, n: todas.length, media: m, min: todas.length ? Math.min(...todas) : null, max: todas.length ? Math.max(...todas) : null, desv: desv(todas),
+      notaPropio: propio ? propio.nota : null, mediaRival: media(riv), nRival: riv.length, mediaOtra: media(otr), nOtra: otr.length, castigados, perfil };
+  });
+
+  // ---- por participante (resultado oficial vs. resultado con solo el publico neutral) ----
+  const filasP = Object.values(part).filter((p) => !p.ausente).map((p) => {
+    const todas = notasDe((v) => v.cid === p.id);
+    const pr = notasDe((v) => v.cid === p.id && v.rel === 'propio');
+    const ri = notasDe((v) => v.cid === p.id && v.rel === 'rival');
+    const ne = notasDe((v) => v.cid === p.id && (v.rel === 'otra' || v.rel === 'sin'));
+    const agg = (a) => ({ votos: a.length, suma: a.reduce((x, y) => x + y, 0) });
+    const of = calcularResultado({ agregado: agg(todas), notas: (D.notas || {})[p.id], config: D.config, jurados: D.jurados });
+    const neu = calcularResultado({ agregado: agg(ne), notas: (D.notas || {})[p.id], config: D.config, jurados: D.jurados });
+    const h = historial[p.id] || {};
+    return { id: p.id, nombre: p.nombre, nombreCompleto: p.nombreCompleto || p.nombre, cat: p.categoria, escena: h.escena || null,
+      n: todas.length, media: media(todas), mediana: mediana(todas), mediaPropia: media(pr), nPropia: pr.length, mediaRival: media(ri), nRival: ri.length,
+      mediaNeutral: media(ne), nNeutral: ne.length, pctBajos: proporcion(todas, (x) => x <= opc.bajo), jurado: of.promJurado,
+      finalOf: of.final, finalNeu: neu.final, of, neu };
+  });
+  for (const c of CATEGORIAS) {
+    const fs = filasP.filter((f) => f.cat === c);
+    [...fs].sort((a, b) => compararResultados(a.of, b.of)).forEach((f, i) => (f.puestoOf = f.finalOf == null ? null : i + 1, f.premioOf = puestoDe(c, i)));
+    [...fs].sort((a, b) => compararResultados(a.neu, b.neu)).forEach((f, i) => (f.puestoNeu = f.finalNeu == null ? null : i + 1, f.premioNeu = puestoDe(c, i)));
+  }
+
+  // ---- por barra (los que vinieron a acompañar a cada finalista) ----
+  const barras = Object.values(part).map((p) => {
+    const bs = boletas.filter((b) => b.barra === p.id);
+    const vs = votos.filter((v) => v.barra === p.id);
+    const riv = vs.filter((v) => v.rel === 'rival').map((v) => v.nota), otr = vs.filter((v) => v.rel === 'otra').map((v) => v.nota);
+    const pr = vs.filter((v) => v.rel === 'propio').map((v) => v.nota);
+    return { id: p.id, nombre: p.nombre, cat: p.categoria, boletas: bs.length, votaron: bs.filter((b) => b.n).length,
+      mediaPropio: media(pr), mediaRival: media(riv), nRival: riv.length, mediaOtra: media(otr), nOtra: otr.length,
+      brecha: dif(media(otr), media(riv)), castigo: bs.filter((b) => b.perfil === 'castigo').length };
+  }).filter((b) => b.boletas > 0);
+
+  // ---- brecha pareada: la misma boleta, rivales directos vs. otras categorias ----
+  const pares = boletas.filter((b) => b.nRival && b.nOtra).map((b) => b.mediaOtra - b.mediaRival);
+
+  // ---- matriz barra x participante por categoria ----
+  const matrices = CATEGORIAS.map((c) => {
+    const cols = Object.values(part).filter((p) => p.categoria === c && !p.ausente && votos.some((v) => v.cid === p.id));
+    const filas = barras.filter((b) => b.cat === c);
+    const neutral = {}; cols.forEach((p) => (neutral[p.id] = media(notasDe((v) => v.cid === p.id && (v.rel === 'otra' || v.rel === 'sin')))));
+    const celdas = filas.map((b) => cols.map((p) => { const a = notasDe((v) => v.barra === b.id && v.cid === p.id); return { m: media(a), n: a.length, d: dif(media(a), neutral[p.id]) }; }));
+    return { cat: c, cols, filas, celdas, neutral };
+  });
+
+  return { part, votos, boletas, filasP, barras, pares, matrices, notasDe };
+}
+
+// =====================================================================
+//  GRAFICAS (SVG a mano, con tooltip)
+// =====================================================================
+const tips = new Map(); let tipId = 0;
+const tip = (titulo, filas) => { const id = 't' + (++tipId); tips.set(id, { titulo, filas }); return id; };
+function activarTooltips() {
+  const caja = $('#tip');
+  const mostrar = (el, x, y) => {
+    const d = tips.get(el.dataset.tip); if (!d) return;
+    caja.replaceChildren();
+    const t = document.createElement('span'); t.className = 't'; t.textContent = d.titulo; caja.appendChild(t);
+    d.filas.forEach(([k, v]) => { const f = document.createElement('div'); const a = document.createElement('span'); a.textContent = k; const b = document.createElement('strong'); b.textContent = v; f.append(a, b); caja.appendChild(f); });
+    caja.classList.remove('oculto');
+    const w = caja.offsetWidth, h = caja.offsetHeight;
+    caja.style.left = Math.min(window.innerWidth - w - 8, x + 14) + 'px';
+    caja.style.top = (y + h + 20 > window.innerHeight ? y - h - 12 : y + 14) + 'px';
+  };
+  document.addEventListener('pointermove', (e) => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el) mostrar(el, e.clientX, e.clientY); else caja.classList.add('oculto'); });
+  document.addEventListener('focusin', (e) => { const el = e.target.closest && e.target.closest('[data-tip]'); if (el) { const r = el.getBoundingClientRect(); mostrar(el, r.right, r.top); } });
+  document.addEventListener('focusout', () => caja.classList.add('oculto'));
+}
+const pctTxt = (x) => (x == null ? '—' : Math.round(x * 100) + ' %');
+const n2 = (x) => num(x, 2), n1 = (x) => num(x, 1);
+const BINS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+const binDe = (n) => Math.min(10, Math.floor(n + 1e-9));
+
+// Histograma: % de votos por nota entera (0–0,9 … 9–9,9 y 10)
+function histograma(notas, titulo, maxPct) {
+  const W = 300, H = 150, m = { l: 26, r: 6, t: 10, b: 22 }, cw = (W - m.l - m.r) / 11;
+  const cuenta = BINS.map((_, i) => notas.filter((n) => binDe(n) === i).length);
+  const tot = notas.length || 1;
+  const y = (p) => m.t + (H - m.t - m.b) * (1 - p / maxPct);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(titulo)}">`;
+  [0, .5, 1].forEach((f) => { const p = maxPct * f, yy = y(p); s += `<line x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}" stroke="var(--grid)"/><text x="${m.l - 4}" y="${yy + 3}" text-anchor="end">${Math.round(p * 100)}%</text>`; });
+  cuenta.forEach((c, i) => {
+    const p = c / tot, x = m.l + i * cw + 1, h = Math.max(0, y(0) - y(p));
+    const id = tip(`${titulo} · nota ${i === 10 ? '10' : i + ' a ' + i + ',9'}`, [['Votos', String(c)], ['Del total', pctTxt(c / tot)]]);
+    s += `<rect x="${m.l + i * cw}" y="${m.t}" width="${cw}" height="${H - m.t - m.b}" fill="transparent" data-tip="${id}" tabindex="0"/>`;
+    if (h > 0) s += `<path d="M${x},${y(0)} v${-(h - Math.min(4, h))} q0,-${Math.min(4, h)} ${Math.min(4, h)},-${Math.min(4, h)} h${cw - 2 - 2 * Math.min(4, h)} q${Math.min(4, h)},0 ${Math.min(4, h)},${Math.min(4, h)} v${h - Math.min(4, h)} z" fill="var(--seq)" pointer-events="none"/>`;
+    s += `<text x="${m.l + i * cw + cw / 2}" y="${H - 7}" text-anchor="middle">${BINS[i]}</text>`;
+  });
+  s += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--eje)"/></svg>`;
+  return s;
+}
+
+// Barras horizontales (una sola serie)
+function barrasH(items) {
+  const max = Math.max(1, ...items.map((i) => i.v));
+  return `<div style="display:grid;gap:8px">${items.map((i) => {
+    const id = tip(i.k, i.tip);
+    return `<div data-tip="${id}" tabindex="0"><div class="fila" style="justify-content:space-between"><span>${esc(i.k)}</span><b class="mono">${esc(i.etq)}</b></div>
+      <div style="height:10px;background:rgba(255,255,255,.06);border-radius:0 4px 4px 0"><div style="height:10px;width:${(i.v / max) * 100}%;background:var(--seq);border-radius:0 4px 4px 0"></div></div></div>`;
+  }).join('')}</div>`;
+}
+
+// Lineas (mismo eje 0–10). series = [{nombre, color, puntos:[{x, y, etq, n}]}]
+function lineas({ series, xs, etqX, marcaX = null, marcaEtq = '' }) {
+  const W = Math.max(320, Math.min(1240, (app.clientWidth || 800) - 70)), H = W < 600 ? 220 : 260, m = { l: 30, r: 16, t: 14, b: 34 };
+  const xMin = Math.min(...xs), xMax = Math.max(...xs), X = (v) => m.l + (xMax === xMin ? .5 : (v - xMin) / (xMax - xMin)) * (W - m.l - m.r);
+  const Y = (v) => m.t + (H - m.t - m.b) * (1 - v / 10);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  [0, 2, 4, 6, 8, 10].forEach((v) => (s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`));
+  // etiquetas del eje X sin encimarse: la primera, la ultima y las que quepan entre ellas
+  const hueco = Math.max(...xs.map((x) => String(etqX(x)).length)) * 6.2 + 16, xu = X(xs[xs.length - 1]);
+  let ultimaX = -1e9;
+  xs.forEach((x, i) => { const ult = i === xs.length - 1, px = X(x);
+    if (i === 0 || ult || (px - ultimaX >= hueco && xu - px >= hueco)) { ultimaX = px;
+      s += `<text x="${px}" y="${H - 12}" text-anchor="${i === 0 ? 'start' : ult ? 'end' : 'middle'}">${esc(etqX(x))}</text>`; } });
+  if (marcaX != null && marcaX >= xMin && marcaX <= xMax) s += `<line x1="${X(marcaX)}" x2="${X(marcaX)}" y1="${m.t}" y2="${Y(0)}" stroke="var(--oro)" stroke-dasharray="4 4"/><text x="${X(marcaX) + 4}" y="${Y(0) - 6}" style="fill:var(--oro)">${esc(marcaEtq)}</text>`;
+  series.forEach((se) => {
+    const pts = se.puntos.filter((p) => p.y != null);
+    if (pts.length > 1) s += `<polyline fill="none" stroke="${se.color}" stroke-width="2" stroke-linejoin="round" points="${pts.map((p) => X(p.x) + ',' + Y(p.y)).join(' ')}"/>`;
+    pts.forEach((p) => (s += `<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="4" fill="${se.color}" stroke="#1d1027" stroke-width="2" pointer-events="none"/>`));
+  });
+  // franjas verticales para el tooltip (todas las series en ese punto)
+  xs.forEach((x, i) => {
+    const izq = i ? (X(xs[i - 1]) + X(x)) / 2 : m.l, der = i < xs.length - 1 ? (X(x) + X(xs[i + 1])) / 2 : W - m.r;
+    const filas = series.map((se) => { const p = se.puntos.find((q) => q.x === x); return [se.nombre, p && p.y != null ? n2(p.y) + (p.n != null ? ` (${p.n})` : '') : '—']; });
+    const pt = series[0].puntos.find((q) => q.x === x);
+    s += `<rect x="${izq}" y="${m.t}" width="${Math.max(1, der - izq)}" height="${H - m.t - m.b}" fill="transparent" data-tip="${tip(pt && pt.etq ? pt.etq : etqX(x), filas)}"/>`;
+  });
+  s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--eje)"/></svg>`;
+  return `<div class="leyenda">${series.map((se) => `<span><i style="background:${se.color}"></i>${esc(se.nombre)}</span>`).join('')}</div>${s}`;
+}
+
+// color divergente: d = diferencia frente al publico neutral (−4 … +4)
+function colorDif(d) {
+  if (d == null) return 'transparent';
+  const t = Math.max(-1, Math.min(1, d / 4));
+  const a = [0x3a, 0x35, 0x40], b = t < 0 ? [0xe0, 0x52, 0x4f] : [0x3d, 0x8b, 0xe8], k = Math.abs(t);
+  return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * k).toString(16).padStart(2, '0')).join('');
+}
+
+// =====================================================================
+//  TABLERO
+// =====================================================================
+const desc = (n) => (n === 1 ? '1 voto' : n + ' votos');
+function pintarTablero() {
+  tips.clear();
+  const A = analizar();
+  const { votos, boletas, filasP, barras, pares, matrices, notasDe } = A;
+  const conBarra = votos.filter((v) => v.rel !== 'sin');
+  const nVotaron = boletas.filter((b) => b.n).length;
+  const tardios = votos.filter((v) => v.momento === 'tardio');
+  const brecha = media(pares);
+  const castigo = boletas.filter((b) => b.perfil === 'castigo').length;
+  const conBarraBol = boletas.filter((b) => b.barra !== 'NINGUNO' && b.n).length;
+  const todas = votos.map((v) => v.nota);
+  const rels = ['propio', 'rival', 'otra', 'sin'];
+  const porRel = Object.fromEntries(rels.map((r) => [r, notasDe((v) => v.rel === r)]));
+  const maxPct = Math.max(.1, ...rels.map((r) => { const a = porRel[r]; return a.length ? Math.max(...BINS.map((_, i) => a.filter((n) => binDe(n) === i).length / a.length)) : 0; }));
+  const marca = opc.llamado ? (() => { const [h, mi] = opc.llamado.split(':').map(Number); const ref = new Date(votos.find((v) => v.t)?.t || Date.now()); ref.setHours(h, mi, 0, 0); return ref.getTime(); })() : null;
+
+  // ---- tendencia en el tiempo: tramos de 15 minutos ----
+  const conT = votos.filter((v) => v.t);
+  const TR = 15 * 60000;
+  let tramos = [];
+  if (conT.length) {
+    const t0 = Math.floor(Math.min(...conT.map((v) => v.t)) / TR) * TR, t1 = Math.max(...conT.map((v) => v.t));
+    for (let t = t0; t <= t1; t += TR) tramos.push(t);
+  }
+  const serieT = (f, nombre, color) => ({ nombre, color, puntos: tramos.map((t) => { const a = conT.filter((v) => v.t >= t && v.t < t + TR && f(v)).map((v) => v.nota); return { x: t, y: a.length ? media(a) : null, n: a.length, etq: `${horaDe(t)} a ${horaDe(t + TR)}` }; }) });
+
+  // ---- orden de presentacion ----
+  const enEscena = filasP.filter((f) => f.escena).sort((a, b) => a.escena - b.escena);
+  const antes = marca ? notasDe((v) => v.rel === 'rival' && v.t && v.t < marca) : [];
+  const despues = marca ? notasDe((v) => v.rel === 'rival' && v.t && v.t >= marca) : [];
+
+  const cabezaP = '<tr><th>Participante</th><th class="n">Votos</th><th class="n">Promedio</th><th class="n">Mediana</th><th class="n">De su barra</th><th class="n">De barras rivales</th><th class="n">Público neutral</th><th class="n">Efecto barra</th><th class="n">Castigo recibido</th><th class="n">Votos ≤ ' + n1(opc.bajo) + '</th><th class="n">Jurado</th><th class="n">Puesto oficial</th><th class="n">Puesto con público neutral</th></tr>';
+  const celda = (m, n, min = 3) => `<td class="n ${n < min ? 'pocos' : ''}">${m == null ? '—' : n2(m)} <span class="suave chico">(${n})</span></td>`;
+  const signo = (d, invertir = false) => (d == null ? '<td class="n">—</td>' : `<td class="n ${(invertir ? -d : d) > 0.25 ? 'sube' : (invertir ? -d : d) < -0.25 ? 'baja' : ''}">${d > 0 ? '+' : ''}${n2(d)}</td>`);
+
+  app.innerHTML = `
+  <div class="tarjeta">
+    <div class="fila" style="justify-content:space-between">
+      <div><h2 style="margin:0">📊 Análisis de votaciones del público</h2>
+      <div class="suave chico">${D.origen === 'vivo' ? 'Datos en vivo leídos a las ' + horaDe(Date.parse(D.fecha)) : 'Respaldo: ' + esc(D.archivo || '') + (D.fecha ? ' · ' + new Date(D.fecha).toLocaleString('es-CO') : '')}</div></div>
+      <div class="barra-acciones">
+        ${D.origen === 'vivo' ? '<button class="boton secundario chico" id="b-actualizar">↻ Actualizar</button>' : ''}
+        <button class="boton chico" id="b-excel">⬇ Excel para el análisis</button>
+        <button class="boton secundario chico" id="b-json">⬇ Respaldo completo (.json)</button>
+        <button class="boton secundario chico" id="b-otro">Abrir otro respaldo</button>
+      </div>
+    </div>
+    <details style="margin-top:12px"><summary>Ajustes del análisis</summary>
+      <div class="ajustes" style="margin-top:10px">
+        <div class="campo" style="margin:0"><label for="o-alto">Nota alta (apoyo) desde</label><input id="o-alto" type="number" step="0.1" min="0" max="10" value="${opc.alto}"></div>
+        <div class="campo" style="margin:0"><label for="o-bajo">Nota baja (castigo) hasta</label><input id="o-bajo" type="number" step="0.1" min="0" max="10" value="${opc.bajo}"></div>
+        <div class="campo" style="margin:0"><label for="o-llamado">Hora del llamado del presentador al voto solidario</label><input id="o-llamado" type="time" value="${esc(opc.llamado)}"></div>
+        <label class="fila" style="margin:0 0 10px;color:var(--texto)"><input id="o-nombres" type="checkbox" style="width:auto" ${opc.nombres ? 'checked' : ''}> Incluir nombres de asistentes en el Excel</label>
+      </div>
+    </details>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Resumen</h2>
+    <div class="kpis">
+      <div class="kpi"><b>${boletas.length}</b><span>boletas registradas</span></div>
+      <div class="kpi"><b>${nVotaron}</b><span>boletas que votaron</span></div>
+      <div class="kpi"><b>${votos.length}</b><span>calificaciones del público</span></div>
+      <div class="kpi"><b>${n2(media(todas))}</b><span>nota promedio del público</span></div>
+      <div class="kpi"><b>${pctTxt(proporcion(todas, (x) => x >= 10))}</b><span>de las notas fueron 10</span></div>
+      <div class="kpi"><b>${pctTxt(proporcion(todas, (x) => x <= opc.bajo))}</b><span>fueron ${n1(opc.bajo)} o menos</span></div>
+      <div class="kpi"><b>${pctTxt(votos.length ? tardios.length / votos.length : null)}</b><span>votos tardíos (después de su canción)</span></div>
+    </div>
+    <div class="clave">
+      <div class="suave chico">Brecha de rivalidad (la misma boleta: lo que da a otras categorías menos lo que da a sus rivales directos)</div>
+      <b class="grande">${brecha == null ? '—' : (brecha > 0 ? '+' : '') + n2(brecha)}</b>
+      <span class="suave chico"> puntos · ${pares.length} boletas comparables</span>
+      <div class="chico" style="margin-top:6px">${brecha == null ? 'Aún no hay boletas que hayan calificado tanto a rivales directos como a otras categorías.' : brecha > 0.5 ? 'Los asistentes calificaron <b>más bajo a los rivales directos</b> de su finalista que a participantes que no competían con él: hubo conducta de rivalidad.' : brecha < -0.5 ? 'Los asistentes calificaron <b>más alto</b> a los rivales directos que al resto: predominó la solidaridad.' : 'No hay diferencia apreciable entre lo que dieron a los rivales directos y a los demás: el voto fue <b>solidario o neutral</b>.'}
+      ${castigo ? ` <b>${castigo}</b> de ${conBarraBol} boletas con finalista (${pctTxt(conBarraBol ? castigo / conBarraBol : null)}) muestran el patrón de castigo.` : ''}</div>
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>¿Cómo calificó la gente según a quién vino a acompañar?</h2>
+    <p class="suave chico">Porcentaje de las notas en cada rango. Si hay rivalidad, el panel «A rivales directos» se carga a la izquierda (notas bajas) comparado con «A otras categorías».</p>
+    <div class="multiples">${rels.map((r) => `<div class="panel"><h4>${REL[r]}</h4><div class="suave chico">${desc(porRel[r].length)} · promedio ${n2(media(porRel[r]))}</div>${histograma(porRel[r], REL[r], maxPct)}</div>`).join('')}</div>
+    <div class="envoltura-tabla" style="margin-top:12px"><table class="tabla"><tr><th>Relación</th><th class="n">Votos</th><th class="n">Promedio</th><th class="n">Mediana</th><th class="n">Notas de 10</th><th class="n">Notas ≤ ${n1(opc.bajo)}</th><th class="n">Promedio en vivo</th><th class="n">Promedio tardío</th></tr>
+    ${rels.map((r) => { const a = porRel[r]; const vi = notasDe((v) => v.rel === r && v.momento === 'vivo'), ta = notasDe((v) => v.rel === r && v.momento === 'tardio');
+      return `<tr><td>${REL[r]}</td><td class="n">${a.length}</td><td class="n">${n2(media(a))}</td><td class="n">${n2(mediana(a))}</td><td class="n">${pctTxt(proporcion(a, (x) => x >= 10))}</td><td class="n">${pctTxt(proporcion(a, (x) => x <= opc.bajo))}</td>${celda(media(vi), vi.length, 1)}${celda(media(ta), ta.length, 1)}</tr>`; }).join('')}
+    </table></div>
+  </div>
+
+  <div class="dos">
+    <div class="tarjeta"><h2>Perfiles de votante</h2><p class="suave chico">Cada boleta se clasifica según su forma de votar.</p>
+      ${barrasH(PERFILES.map(([k, nom, def]) => { const c = boletas.filter((b) => b.perfil === k).length; return { k: nom, v: c, etq: `${c} · ${pctTxt(boletas.length ? c / boletas.length : null)}`, tip: [['Boletas', String(c)], ['Criterio', def]] }; }))}
+    </div>
+    <div class="tarjeta"><h2>Efecto del llamado del presentador</h2>
+      ${marca ? `<p class="suave chico">Notas a rivales directos antes y después de las ${horaDe(marca)}.</p>
+        <div class="kpis"><div class="kpi"><b>${n2(media(antes))}</b><span>antes · ${desc(antes.length)}</span></div><div class="kpi"><b>${n2(media(despues))}</b><span>después · ${desc(despues.length)}</span></div>
+        <div class="kpi"><b>${pctTxt(proporcion(antes, (x) => x <= opc.bajo))} → ${pctTxt(proporcion(despues, (x) => x <= opc.bajo))}</b><span>notas ≤ ${n1(opc.bajo)} a rivales</span></div></div>`
+        : '<p class="suave">Escribe en <b>Ajustes del análisis</b> la hora en que el presentador invitó a votar solidariamente, y aquí verás si las notas a los rivales cambiaron después de ese momento. También se marca en la gráfica del tiempo.</p>'}
+    </div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Tendencia durante el evento</h2>
+    <p class="suave chico">Promedio de las notas cada 15 minutos (entre paréntesis, cuántos votos).</p>
+    ${tramos.length ? lineas({ xs: tramos, etqX: horaDe, marcaX: marca, marcaEtq: 'Llamado', series: [serieT((v) => v.rel === 'rival', 'A rivales directos', 'var(--s2)'), serieT((v) => v.rel === 'otra' || v.rel === 'sin', 'Público neutral', 'var(--s1)'), serieT((v) => v.rel === 'propio', 'A su finalista', 'var(--s3)')] }) : '<p class="suave">Sin votos con hora.</p>'}
+    ${enEscena.length > 1 ? `<h3 style="margin-top:18px">Por orden de presentación</h3><p class="suave chico">¿Cambia la nota del público frente a la del jurado a medida que avanza el evento?</p>
+      ${lineas({ xs: enEscena.map((_, i) => i + 1), etqX: (x) => String(x), series: [
+        { nombre: 'Público (todos)', color: 'var(--s1)', puntos: enEscena.map((f, i) => ({ x: i + 1, y: f.media, n: f.n, etq: `${i + 1}. ${f.nombre} · ${horaDe(f.escena)}` })) },
+        { nombre: 'Jurado', color: 'var(--s2)', puntos: enEscena.map((f, i) => ({ x: i + 1, y: f.jurado })) }] })}` : ''}
+  </div>
+
+  <div class="tarjeta">
+    <h2>Comportamiento de cada barra</h2>
+    <p class="suave chico">Barra = las boletas que dijeron venir a acompañar a ese finalista. «Brecha» = lo que dio a otras categorías menos lo que dio a sus rivales directos (positivo = rivalidad).</p>
+    <div class="envoltura-tabla"><table class="tabla"><tr><th>Barra de</th><th>Categoría</th><th class="n">Boletas</th><th class="n">Votaron</th><th class="n">A su finalista</th><th class="n">A rivales directos</th><th class="n">A otras categorías</th><th class="n">Brecha</th><th class="n">Boletas con castigo</th></tr>
+    ${[...barras].sort((a, b) => (b.brecha ?? -99) - (a.brecha ?? -99)).map((b) => `<tr><td>${esc(b.nombre)}</td><td>${esc(b.cat)}</td><td class="n">${b.boletas}</td><td class="n">${b.votaron}</td><td class="n">${b.mediaPropio == null ? '—' : n2(b.mediaPropio)}</td>${celda(b.mediaRival, b.nRival)}${celda(b.mediaOtra, b.nOtra)}${signo(b.brecha, true)}<td class="n">${b.castigo ? `<span class="etq alerta">${b.castigo}</span>` : '0'}</td></tr>`).join('') || '<tr><td colspan="9" class="suave">Aún no hay boletas registradas.</td></tr>'}
+    </table></div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Matriz de rivalidad por categoría</h2>
+    <p class="suave chico">Fila = barra que vota · columna = participante calificado · número = promedio que esa barra le dio. El color compara con lo que le dio el público neutral (otras categorías y sin finalista): <b>rojo</b> = le dieron menos (castigo), <b>azul</b> = le dieron más. El recuadro dorado es su propio finalista.</p>
+    <div class="leyenda"><span>−4</span><span class="rampa"></span><span>+4 puntos frente al público neutral</span></div>
+    ${matrices.filter((M) => M.filas.length && M.cols.length).map((M) => `<h3 style="margin-top:14px">${esc(M.cat)}</h3><div class="envoltura-tabla" style="max-height:none"><table class="matriz">
+      <tr><th></th>${M.cols.map((p) => `<th class="col" title="${esc(p.nombre)}">${esc(p.nombre)}</th>`).join('')}</tr>
+      <tr><th class="fila suave">Público neutral</th>${M.cols.map((p) => `<td style="background:rgba(255,255,255,.06)">${M.neutral[p.id] == null ? '—' : n1(M.neutral[p.id])}</td>`).join('')}</tr>
+      ${M.filas.map((b, i) => `<tr><th class="fila" title="Barra de ${esc(b.nombre)}">Barra de ${esc(b.nombre)}</th>${M.cols.map((p, j) => { const c = M.celdas[i][j];
+        if (!c.n) return `<td class="vacio ${p.id === b.id ? 'diag' : ''}">·</td>`;
+        return `<td class="${p.id === b.id ? 'diag' : ''}" style="background:${colorDif(c.d)}" tabindex="0" data-tip="${tip(`Barra de ${b.nombre} → ${p.nombre}`, [['Promedio que le dio', n2(c.m)], ['Votos', String(c.n)], ['Público neutral', M.neutral[p.id] == null ? '—' : n2(M.neutral[p.id])], ['Diferencia', c.d == null ? '—' : (c.d > 0 ? '+' : '') + n2(c.d)]])}">${n1(c.m)}</td>`; }).join('')}</tr>`).join('')}
+    </table></div>`).join('') || '<p class="suave">Aún no hay votos de barras.</p>'}
+  </div>
+
+  <div class="tarjeta">
+    <h2>Por participante</h2>
+    <p class="suave chico">«Efecto barra» = nota de su barra menos la del público neutral. «Castigo recibido» = público neutral menos la nota que le dieron las barras rivales (positivo = lo castigaron). La última columna muestra en qué puesto quedaría si solo contara el público neutral (el jurado igual). Entre paréntesis, cuántos votos; en gris, menos de 3.</p>
+    <div class="envoltura-tabla"><table class="tabla">${cabezaP}
+    ${CATEGORIAS.map((c) => { const fs = filasP.filter((f) => f.cat === c).sort((a, b) => (a.puestoOf ?? 99) - (b.puestoOf ?? 99)); if (!fs.length) return '';
+      return `<tr class="cat"><td colspan="13">${esc(c)}</td></tr>` + fs.map((f) => `<tr><td style="white-space:nowrap">${esc(f.nombre)} <span class="suave chico">${esc(f.id)}</span></td><td class="n">${f.n}</td><td class="n">${n2(f.media)}</td><td class="n">${n2(f.mediana)}</td>${celda(f.mediaPropia, f.nPropia)}${celda(f.mediaRival, f.nRival)}${celda(f.mediaNeutral, f.nNeutral)}${signo(dif(f.mediaPropia, f.mediaNeutral))}${signo(dif(f.mediaNeutral, f.mediaRival), true)}<td class="n">${pctTxt(f.pctBajos)}</td><td class="n">${n2(f.jurado)}</td><td class="n">${f.puestoOf ?? '—'}</td><td class="n">${f.puestoNeu ?? '—'}${f.puestoOf && f.puestoNeu && f.puestoOf !== f.puestoNeu ? ` <span class="etq ${f.premioOf !== f.premioNeu ? 'alerta' : ''}">${f.puestoNeu < f.puestoOf ? '▲' : '▼'} ${Math.abs(f.puestoOf - f.puestoNeu)}</span>` : ''}</td></tr>`).join(''); }).join('')}
+    </table></div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Boletas con patrón de castigo</h2>
+    <p class="suave chico">Le dieron ${n1(opc.alto)} o más a su finalista y ${n1(opc.bajo)} o menos a por lo menos un rival directo. Se muestran por número de boleta (anónimo).</p>
+    <div class="envoltura-tabla"><table class="tabla"><tr><th>Boleta</th><th>Vino a acompañar a</th><th class="n">Nota a su finalista</th><th class="n">Rivales calificados</th><th class="n">Rivales con ≤ ${n1(opc.bajo)}</th><th class="n">Promedio a rivales</th><th class="n">Promedio a otras categorías</th></tr>
+    ${boletas.filter((b) => b.perfil === 'castigo').map((b) => `<tr><td class="mono">${esc(b.boleta)}</td><td>${esc(A.part[b.barra] ? A.part[b.barra].nombre : '')}</td><td class="n">${n1(b.notaPropio)}</td><td class="n">${b.nRival}</td><td class="n"><span class="etq alerta">${b.castigados}</span></td><td class="n">${n2(b.mediaRival)}</td><td class="n">${b.nOtra ? n2(b.mediaOtra) : '—'}</td></tr>`).join('') || '<tr><td colspan="7" class="suave">Ninguna boleta muestra el patrón de castigo.</td></tr>'}
+    </table></div>
+  </div>
+
+  <div class="tarjeta">
+    <details><summary>Cómo se calcula cada dato</summary>
+    <ul class="nota-metodo">
+      <li><b>Barra</b>: al registrarse, cada asistente dijo a qué finalista venía a acompañar. Las boletas que respondieron «ninguno» forman el grupo «sin finalista».</li>
+      <li><b>Rival directo</b>: participante de la misma categoría que el finalista de esa boleta. <b>Otras categorías</b>: participantes que no compiten con su finalista; sirven de referencia neutral para la misma persona.</li>
+      <li><b>Público neutral</b> de un participante: votos de boletas que acompañan a alguien de otra categoría o a nadie.</li>
+      <li><b>Brecha de rivalidad</b>: para cada boleta que calificó rivales directos y otras categorías se resta (promedio a otras categorías − promedio a rivales) y se promedian esas diferencias. Comparar a la misma persona consigo misma elimina el efecto de quienes son más generosos o más exigentes.</li>
+      <li><b>Voto en vivo</b>: emitido mientras el participante cantaba (hasta el cierre de su votación). <b>Tardío</b>: emitido después, en «calificaciones pendientes».</li>
+      <li>Las notas se agrupan por su parte entera: «7» incluye de 7,0 a 7,9. Con pocos votos (menos de 3) los promedios son poco confiables y se ven en gris.</li>
+      <li>Los participantes marcados «No se presentó» no aparecen. El análisis no modifica ningún resultado oficial.</li>
+    </ul></details>
+  </div>`;
+
+  $('#b-actualizar') && ($('#b-actualizar').onclick = () => cargarEnVivo().catch(() => aviso('No se pudo leer. Revisa la conexión', 'error')));
+  $('#b-otro').onclick = () => { D = null; pintarInicio(); };
+  $('#b-json').onclick = () => descargar(`respaldo-votaciones-gran-final-${marcaArchivo()}.json`, JSON.stringify(respaldo(), null, 1), 'application/json');
+  $('#b-excel').onclick = () => exportarExcel(A).catch((e) => { console.error(e); aviso('No se pudo crear el Excel. Descarga el respaldo .json.', 'error', 6000); });
+  const re = () => { opc.alto = Number($('#o-alto').value) || 0; opc.bajo = Number($('#o-bajo').value) || 0; opc.llamado = $('#o-llamado').value; opc.nombres = $('#o-nombres').checked; const det = $('details').open; pintarTablero(); $('details').open = det; };
+  ['#o-alto', '#o-bajo', '#o-llamado', '#o-nombres'].forEach((s) => ($(s).onchange = re));
+}
+
+// =====================================================================
+//  EXPORTAR
+// =====================================================================
+const marcaArchivo = () => { const d = D.fecha ? new Date(D.fecha) : new Date(); const p = (x) => String(x).padStart(2, '0'); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
+function descargar(nombre, contenido, tipo) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(contenido instanceof Blob ? contenido : new Blob([contenido], { type: tipo })); a.download = nombre; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+// Respaldo anonimo: sin claves secretas de las boletas ni de los votos
+function respaldo() {
+  const boletas = {}; Object.entries(D.boletas || {}).forEach(([n, b]) => { const { k, ...resto } = b || {}; boletas[n] = resto; });
+  const votos = {}; Object.entries(D.votos || {}).forEach(([c, vs]) => { votos[c] = {}; Object.entries(vs || {}).forEach(([n, v]) => { const { k, ...resto } = v || {}; votos[c][n] = resto; }); });
+  return { ...Object.fromEntries(RUTAS.map((p) => [p, D[p] || {}])), boletas, votos, fecha: D.fecha || new Date().toISOString() };
+}
+function cargarSheetJS() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  // SheetJS 0.18.5 copiado en la carpeta js/ (funciona sin depender de otro sitio)
+  return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = 'js/xlsx.full.min.js'; s.onload = () => ok(window.XLSX); s.onerror = mal; document.head.appendChild(s); });
+}
+async function exportarExcel(A) {
+  const X = await cargarSheetJS();
+  const nom = (cid) => (A.part[cid] ? A.part[cid].nombre : cid === 'NINGUNO' ? 'Ninguno' : cid);
+  const r2 = (x) => (x == null ? null : Math.round(x * 100) / 100);
+  const hoja = (filas, anchos) => { const h = X.utils.json_to_sheet(filas); if (anchos) h['!cols'] = anchos.map((w) => ({ wch: w })); return h; };
+  const libro = X.utils.book_new();
+  const todas = A.votos.map((v) => v.nota);
+  const resumen = [
+    ['Gran Final · II Festival de la Canción Brilla & Canta 2026', ''], ['Datos leídos', D.fecha ? new Date(D.fecha).toLocaleString('es-CO') : ''], ['', ''],
+    ['Boletas registradas', A.boletas.length], ['Boletas que votaron', A.boletas.filter((b) => b.n).length], ['Calificaciones del público', A.votos.length],
+    ['Nota promedio del público', r2(media(todas))], ['Porcentaje de notas de 10', r2(proporcion(todas, (x) => x >= 10))], [`Porcentaje de notas ≤ ${opc.bajo}`, r2(proporcion(todas, (x) => x <= opc.bajo))],
+    ['Brecha de rivalidad pareada (otras categorías − rivales directos)', r2(media(A.pares))], ['Boletas comparables para la brecha', A.pares.length],
+    ['', ''], ['Nota alta (apoyo) desde', opc.alto], ['Nota baja (castigo) hasta', opc.bajo], ['Hora del llamado del presentador', opc.llamado || '—'],
+    ['', ''], ['Perfil', 'Boletas'], ...PERFILES.map(([k, n]) => [n, A.boletas.filter((b) => b.perfil === k).length]),
+    ['', ''], ['Definiciones', ''], ...PERFILES.map(([, n, d]) => [n, d]),
+    ['Rival directo', 'Participante de la misma categoría que el finalista que acompaña la boleta'], ['Público neutral', 'Boletas que acompañan a alguien de otra categoría o a nadie'],
+    ['Momento', 'En vivo = durante la canción · Tardío = después del cierre de su votación'],
+  ];
+  const hr = X.utils.aoa_to_sheet(resumen); hr['!cols'] = [{ wch: 62 }, { wch: 70 }];
+  X.utils.book_append_sheet(libro, hr, 'Resumen');
+  const RELX = { propio: 'Su finalista', rival: 'Rival directo', otra: 'Otra categoría', sin: 'Boleta sin finalista' };
+  X.utils.book_append_sheet(libro, hoja(A.votos.map((v) => ({ Boleta: v.boleta, ...(opc.nombres ? { Asistente: v.nombreAsistente } : {}), 'Vino a acompañar (código)': v.barra, 'Vino a acompañar': nom(v.barra), 'Categoría de su finalista': v.barraCat,
+    'Participante (código)': v.cid, Participante: nom(v.cid), Categoría: v.cat, Nota: v.nota, Hora: v.t ? new Date(v.t).toLocaleTimeString('es-CO') : '', Momento: v.momento === 'tardio' ? 'Tardío' : 'En vivo', Relación: RELX[v.rel] }))), 'Votos');
+  X.utils.book_append_sheet(libro, hoja(A.boletas.map((b) => ({ Boleta: b.boleta, ...(opc.nombres ? { Asistente: b.nombre } : {}), 'Vino a acompañar': nom(b.barra), Categoría: A.part[b.barra] ? A.part[b.barra].categoria : '', 'Notas emitidas': b.n,
+    'Nota a su finalista': b.notaPropio, 'Promedio a rivales directos': r2(b.mediaRival), 'Rivales calificados': b.nRival, [`Rivales con ≤ ${opc.bajo}`]: b.castigados,
+    'Promedio a otras categorías': r2(b.mediaOtra), 'Promedio general': r2(b.media), Mínima: b.min, Máxima: b.max, 'Desviación': r2(b.desv), Perfil: (PERFILES.find((p) => p[0] === b.perfil) || [])[1] }))), 'Boletas');
+  X.utils.book_append_sheet(libro, hoja(A.filasP.sort((a, b) => CATEGORIAS.indexOf(a.cat) - CATEGORIAS.indexOf(b.cat) || (a.puestoOf ?? 99) - (b.puestoOf ?? 99)).map((f) => ({ Código: f.id, Participante: f.nombre, 'Nombre oficial': f.nombreCompleto, Categoría: f.cat,
+    Votos: f.n, Promedio: r2(f.media), Mediana: r2(f.mediana), 'De su barra': r2(f.mediaPropia), 'Votos de su barra': f.nPropia, 'De barras rivales': r2(f.mediaRival), 'Votos de barras rivales': f.nRival,
+    'Público neutral': r2(f.mediaNeutral), 'Votos neutrales': f.nNeutral, 'Efecto barra': r2(dif(f.mediaPropia, f.mediaNeutral)), 'Castigo recibido': r2(dif(f.mediaNeutral, f.mediaRival)),
+    [`% notas ≤ ${opc.bajo}`]: r2(f.pctBajos), Jurado: r2(f.jurado), 'Final oficial': f.finalOf, 'Puesto oficial': f.puestoOf, 'Final con público neutral': f.finalNeu, 'Puesto con público neutral': f.puestoNeu }))), 'Participantes');
+  X.utils.book_append_sheet(libro, hoja(A.barras.map((b) => ({ 'Barra de': b.nombre, Categoría: b.cat, Boletas: b.boletas, Votaron: b.votaron, 'A su finalista': r2(b.mediaPropio),
+    'A rivales directos': r2(b.mediaRival), 'Votos a rivales': b.nRival, 'A otras categorías': r2(b.mediaOtra), 'Votos a otras categorías': b.nOtra, Brecha: r2(b.brecha), 'Boletas con castigo': b.castigo }))), 'Barras');
+  A.matrices.filter((M) => M.filas.length && M.cols.length).forEach((M) => {
+    const aoa = [['Barra que vota \\ participante', ...M.cols.map((p) => p.nombre)], ['Público neutral', ...M.cols.map((p) => r2(M.neutral[p.id]))],
+      ...M.filas.map((b, i) => ['Barra de ' + b.nombre, ...M.celdas[i].map((c) => r2(c.m))])];
+    const h = X.utils.aoa_to_sheet(aoa); h['!cols'] = [{ wch: 30 }, ...M.cols.map(() => ({ wch: 14 }))];
+    X.utils.book_append_sheet(libro, h, ('Matriz ' + M.cat).slice(0, 31));
+  });
+  X.writeFile(libro, `analisis-votaciones-gran-final-${marcaArchivo()}.xlsx`);
+}
+
+// =====================================================================
+activarTooltips();
+pintarInicio();
+let anchoPrevio = window.innerWidth, tRes = 0;
+window.addEventListener('resize', () => { clearTimeout(tRes); tRes = setTimeout(() => { if (D && Math.abs(window.innerWidth - anchoPrevio) > 40) { anchoPrevio = window.innerWidth; const det = $('details') && $('details').open; pintarTablero(); if (det) $('details').open = true; } }, 300); });
+// si este navegador ya entró como administrador, se conecta solo
+(async () => { try { C = await import('./js/comun.js'); U = await C.sesion(); const ya = await C.fb.get(C.r('admins/' + U.uid)).then((s) => s.exists()); if (ya && !D) await cargarEnVivo(); } catch (e) { /* sin internet: queda la opción del respaldo */ } })();
+</script>
+</body>
+</html>

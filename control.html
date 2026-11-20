@@ -702,7 +702,7 @@ function pAjustes() {
     await fb.set(r('pantalla'), { modo: 'espera' });
     aviso('Datos del ensayo borrados'); pAjustes();
   };
-  $('#a-respaldo').onclick = () => descargar('respaldo-gran-final.json', JSON.stringify({ config: cfg, estado, participantes: part, jurados: jur, boletas: sinClaves(boletas), notas, cierres, fecha: new Date().toISOString() }, null, 1), 'application/json');
+  $('#a-respaldo').onclick = () => descargar('respaldo-gran-final.json', JSON.stringify({ config: cfg, estado, participantes: part, jurados: jur, boletas: sinClaves(boletas), votos: Object.fromEntries(Object.entries(votosTodos || {}).map(([c, vs]) => [c, sinClaves(vs)])), historial, notas, cierres, fecha: new Date().toISOString() }, null, 1), 'application/json');
 }
 
 // =====================================================================
