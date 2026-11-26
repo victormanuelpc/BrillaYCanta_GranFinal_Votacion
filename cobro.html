@@ -130,19 +130,27 @@ function p1() {
   <div class="card"><h2>Cuenta bancaria para el pago</h2>
     ${select('banco', 'Banco', BANCOS, 'Escoja…')}
     <div class="fila2"><div>${select('tipoCuenta', 'Tipo de cuenta', ['Ahorros', 'Corriente', 'Depósito de bajo monto'])}</div><div>${campo('cuenta', 'Número de cuenta', 'inputmode="numeric" autocomplete="off"')}</div></div>
-    <p class="suave" style="font-size:13px">Debe coincidir con la certificación bancaria que adjuntará.</p>
+    <div class="aviso" style="margin-top:10px">✔ La cuenta debe estar <b>a nombre de quien cobra</b>. Cuando le enviemos el dinero, el banco nos mostrará el nombre del dueño de la cuenta, y <b>debe ser el mismo nombre de esta cuenta de cobro</b>. Si no coincide, no podremos hacer el pago.<br><br>✔ La <b>certificación bancaria</b> que adjunte debe ser <b>de esta misma cuenta</b>.</div>
   </div>
-  <div class="card"><h2>Llave Bre-B <span class="opc" style="font-size:14px">(recomendada)</span></h2>
-    <div class="aviso">Con la <b>llave Bre-B</b> le podemos enviar el dinero <b>al instante desde cualquier banco</b>, también en fines de semana y festivos.
-      <br><br><b>Ojo:</b> el número de Nequi o de Daviplata, por sí solo, únicamente sirve para recibir dinero desde otra cuenta Nequi o Daviplata. Si nos da su llave, el pago le llega aunque lo hagamos desde otro banco.</div>
-    <p style="font-size:14px;margin:10px 0 4px"><b>¿Dónde la encuentro?</b> En la app de su banco o billetera (Nequi, Daviplata, Bancolombia, Banco de Bogotá, BBVA, Caja Social…), en la opción <b>«Llaves»</b> o <b>«Bre-B»</b>. Por lo general es su número de celular o su número de cédula.</p>
-    <div class="fila2"><div>${select('tipoLlave', 'Tipo de llave', ['Celular', 'Cédula', 'Correo electrónico', 'Alfanumérica (empieza con @)', 'Código de comercio'], 'Escoja…')}</div><div>${campo('llave', 'Mi llave')}</div></div>
-    <label class="check" style="font-weight:400"><input type="checkbox" id="sinLlave" ${d.sinLlave ? 'checked' : ''}> No tengo llave Bre-B o no sé cuál es (el pago se hará a la cuenta de arriba).</label>
+  <div class="card"><h2>Llave Bre-B de esta misma cuenta <span class="opc" style="font-size:14px">(si la tiene)</span></h2>
+    <p style="margin:0 0 8px">Con la <b>llave</b> le enviamos el dinero <b>al instante, desde cualquier banco</b>, incluso en fines de semana y festivos.</p>
+    <details style="margin:0 0 10px"><summary style="cursor:pointer;color:var(--morado);font-weight:600">¿Qué es una llave y dónde la encuentro?</summary>
+      <p style="font-size:14px;margin:8px 0 0">Es un dato fácil de recordar que reemplaza el número de cuenta para recibir transferencias: casi siempre <b>su número de celular</b> o <b>su número de cédula</b>. Para verla, abra la app de su banco o billetera (Nequi, Daviplata, Bancolombia, Banco de Bogotá, BBVA, Caja Social…) y busque la opción <b>«Llaves»</b> o <b>«Bre-B»</b>. Si no aparece ninguna, es porque todavía no tiene llave en esa cuenta.</p>
+      <p style="font-size:14px;margin:8px 0 0">El número de Nequi o de Daviplata, por sí solo, únicamente sirve para recibir dinero desde otra cuenta Nequi o Daviplata. Con la llave le llega desde cualquier banco.</p></details>
+    <div class="aviso" style="border-left-color:var(--morado-2);background:#f6effc"><b>Importante:</b> la llave tiene que ser <b>de la misma cuenta</b> que escribió arriba (<span id="resumen-cuenta"></span>).<br>
+      Si su llave es de <b>otra</b> cuenta (por ejemplo, la llave es de Daviplata y la cuenta de arriba es de Bancolombia), tiene dos opciones:
+      <ol style="margin:6px 0 0;padding-left:20px"><li>Cambie arriba los datos por los de la cuenta que tiene la llave, y adjunte la certificación de <b>esa</b> cuenta; o</li><li>Marque abajo «Esta cuenta no tiene llave» y le pagaremos a la cuenta de arriba.</li></ol></div>
+    <div class="fila2"><div>${select('tipoLlave', 'Tipo de llave', ['Celular', 'Cédula', 'Correo electrónico', 'Alfanumérica (empieza con @)', 'Código de comercio'], 'Escoja…')}</div><div>${campo('llave', 'Llave')}</div></div>
+    <label class="check" style="font-weight:400" id="lbl-misma"><input type="checkbox" id="mismaCuenta" ${d.mismaCuenta ? 'checked' : ''}> <span>Confirmo que esta llave es de la cuenta <b id="resumen-cuenta2"></b>, que está a mi nombre.</span></label>
+    <label class="check" style="font-weight:400"><input type="checkbox" id="sinLlave" ${d.sinLlave ? 'checked' : ''}> <span>Esta cuenta no tiene llave, o no sé cuál es. <span class="suave">Le pagaremos a la cuenta de arriba.</span></span></label>
     <p id="err" class="error"></p>
     <div class="botones"><button class="sec" id="atras">Atrás</button><button id="sig">Ver mi cuenta de cobro</button></div></div>`;
   const campos = ['parentesco', 'nombre', 'tipoDoc', 'documento', 'direccion', 'municipio', 'celular', 'correo', 'banco', 'tipoCuenta', 'cuenta', 'tipoLlave', 'llave'];
   campos.forEach((k) => { const el = $('#' + k); if (el) el.oninput = el.onchange = () => { d[k] = el.value.trim(); guardarBorrador(); }; });
-  $('#sinLlave').onchange = (e) => { d.sinLlave = e.target.checked; if (d.sinLlave) { d.llave = ''; d.tipoLlave = ''; $('#llave').value = ''; $('#tipoLlave').value = ''; } guardarBorrador(); };
+  const resumenCuenta = () => { const t = `${$('#banco').value || 'su banco'} N.º ${$('#cuenta').value || '…'}`; $('#resumen-cuenta').textContent = t; $('#resumen-cuenta2').textContent = t; };
+  resumenCuenta(); ['banco', 'cuenta'].forEach((k) => $('#' + k).addEventListener('input', resumenCuenta)); $('#banco').addEventListener('change', resumenCuenta);
+  $('#mismaCuenta').onchange = (e) => { d.mismaCuenta = e.target.checked; $('#err').textContent = ''; guardarBorrador(); };
+  $('#sinLlave').onchange = (e) => { d.sinLlave = e.target.checked; if (d.sinLlave) { d.llave = ''; d.tipoLlave = ''; d.mismaCuenta = false; $('#llave').value = ''; $('#tipoLlave').value = ''; $('#mismaCuenta').checked = false; } guardarBorrador(); };
   $('#llave').addEventListener('input', () => { if ($('#llave').value.trim()) { d.sinLlave = false; $('#sinLlave').checked = false; } });
   $('#atras').onclick = () => { paso = 0; pintar(); };
   $('#sig').onclick = () => {
@@ -159,7 +167,7 @@ function p1() {
     if (!d.banco) falta.push('el banco'); if (d.cuenta.length < 6) falta.push('el número de cuenta');
     if (!d.sinLlave) {
       const L = d.llave, T = d.tipoLlave;
-      if (!L && !T) falta.push('su llave Bre-B (o marque «No tengo llave Bre-B»)');
+      if (!L && !T) falta.push('la llave de su cuenta (o marque «Esta cuenta no tiene llave»)');
       else if (!T) falta.push('el tipo de llave');
       else if (!L) falta.push('su llave Bre-B');
       else if (T === 'Celular' && !/^3\d{9}$/.test(L.replace(/\D/g, ''))) falta.push('una llave de celular de 10 dígitos que empiece por 3');
@@ -167,6 +175,7 @@ function p1() {
       else if (T === 'Correo electrónico' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(L)) falta.push('una llave de correo válida');
       else if (T.startsWith('Alfanumérica') && !/^@\S{2,}$/.test(L)) falta.push('una llave alfanumérica que empiece por @');
       if (T === 'Celular' || T === 'Cédula') d.llave = L.replace(/\D/g, '');
+      if (L && T && !d.mismaCuenta) falta.push('confirmar que la llave es de la misma cuenta (si es de otra cuenta, cambie los datos de arriba o marque «Esta cuenta no tiene llave»)');
     }
     if (falta.length) { $('#err').textContent = 'Falta o está incompleto: ' + falta.join(', ') + '.'; return; }
     guardarBorrador(); paso = 2; pintar();
