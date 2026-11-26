@@ -48,7 +48,7 @@ export function concepto(premio, d) {
 }
 export const identificacion = (d) => `${d.tipoDoc || 'C.C.'} N.º ${d.documento || ''}`;
 export const direccion = (d) => [d.direccion, d.municipio].filter(Boolean).join(', ');
-export const notaPago = (d) => `Favor consignar a la cuenta ${String(d.tipoCuenta || 'Ahorros') === 'Depósito de bajo monto' ? 'de depósito de bajo monto' : 'de ' + String(d.tipoCuenta || 'Ahorros').toLowerCase()} N.º ${d.cuenta || ''} de ${d.banco || ''}, a nombre de ${d.nombre || ''}, de la cual se adjunta certificación bancaria.${d.llave && !d.sinLlave ? ` Llave Bre-B (${String(d.tipoLlave || '').replace(/ \(.*\)/, '').toLowerCase()}): ${d.llave}.` : ''}`;
+export const notaPago = (d) => `Favor consignar a la cuenta ${String(d.tipoCuenta || 'Ahorros') === 'Depósito de bajo monto' ? 'de depósito de bajo monto' : 'de ' + String(d.tipoCuenta || 'Ahorros').toLowerCase()} N.º ${d.cuenta || ''} de ${d.banco || ''}, a nombre de ${d.nombre || ''}, de la cual se adjunta certificación bancaria.${d.llave && !d.sinLlave ? ` Llave Bre-B de esta misma cuenta (${String(d.tipoLlave || '').replace(/ \(.*\)/, '').toLowerCase()}): ${d.llave}.` : ''}`;
 
 // Genera el PDF con jsPDF (window.jspdf). firma = dataURL PNG o null
 export function crearPDF(premio, d, firma, fecha = new Date()) {
