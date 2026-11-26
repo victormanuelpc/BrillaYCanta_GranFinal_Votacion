@@ -141,7 +141,7 @@ function p1() {
       Si su llave es de <b>otra</b> cuenta (por ejemplo, la llave es de Daviplata y la cuenta de arriba es de Bancolombia), tiene dos opciones:
       <ol style="margin:6px 0 0;padding-left:20px"><li>Cambie arriba los datos por los de la cuenta que tiene la llave, y adjunte la certificación de <b>esa</b> cuenta; o</li><li>Marque abajo «Esta cuenta no tiene llave» y le pagaremos a la cuenta de arriba.</li></ol></div>
     <div class="fila2"><div>${select('tipoLlave', 'Tipo de llave', ['Celular', 'Cédula', 'Correo electrónico', 'Alfanumérica (empieza con @)', 'Código de comercio'], 'Escoja…')}</div><div>${campo('llave', 'Llave')}</div></div>
-    <label class="check" style="font-weight:400" id="lbl-misma"><input type="checkbox" id="mismaCuenta" ${d.mismaCuenta ? 'checked' : ''}> <span>Confirmo que esta llave es de la cuenta <b id="resumen-cuenta2"></b>, que está a mi nombre.</span></label>
+    <label class="check" style="font-weight:400" id="lbl-misma"><input type="checkbox" id="mismaCuenta" ${d.mismaCuenta ? 'checked' : ''}> <span>Confirmo que esta llave es de la cuenta (<b id="resumen-cuenta2"></b>) que está a mi nombre.</span></label>
     <label class="check" style="font-weight:400"><input type="checkbox" id="sinLlave" ${d.sinLlave ? 'checked' : ''}> <span>Esta cuenta no tiene llave, o no sé cuál es. <span class="suave">Le pagaremos a la cuenta de arriba.</span></span></label>
     <p id="err" class="error"></p>
     <div class="botones"><button class="sec" id="atras">Atrás</button><button id="sig">Ver mi cuenta de cobro</button></div></div>`;
