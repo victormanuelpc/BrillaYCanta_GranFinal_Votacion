@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#4b1470">
+<title>Cuenta de cobro · Premio Brilla & Canta</title>
+<link rel="icon" href="img/favicon.png">
+<style>
+  :root { --morado: #4b1470; --morado-2: #6b2a99; --oro: #c98500; --fondo: #f6f3fa; --panel: #fff; --borde: #e0d8ea; --txt: #1f1630; --suave: #675d78; --verde: #0f8a4a; --rojo: #c0392b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--txt); font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  header { background: var(--morado); color: #fff; padding: 14px 16px; display: flex; gap: 12px; align-items: center; }
+  header img { width: 46px; height: auto; } header b { display: block; font-size: 17px; } header span { font-size: 13px; opacity: .85; }
+  main { max-width: 680px; margin: 0 auto; padding: 16px 16px 60px; }
+  .card { background: var(--panel); border: 1px solid var(--borde); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  h1 { font-size: 20px; margin: 0 0 6px; color: var(--morado); } h2 { font-size: 17px; margin: 0 0 8px; color: var(--morado); }
+  .pasos { display: flex; gap: 6px; margin: 0 0 14px; } .pasos div { flex: 1; height: 6px; border-radius: 3px; background: var(--borde); } .pasos div.on { background: var(--morado-2); }
+  .premio { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .premio div { background: var(--fondo); border-radius: 10px; padding: 10px; }
+  .premio small { display: block; color: var(--suave); font-size: 12px; } .premio b { font-size: 16px; } .premio .valor b { font-size: 22px; color: var(--morado); }
+  ul { padding-left: 20px; margin: 6px 0; } li { margin: 4px 0; }
+  .aviso { background: #fff7e6; border-left: 4px solid var(--oro); padding: 10px 12px; border-radius: 8px; font-size: 14px; }
+  .legal { font-size: 13px; color: var(--suave); background: var(--fondo); border-radius: 10px; padding: 12px; max-height: 220px; overflow: auto; }
+  label { display: block; font-weight: 600; font-size: 14px; margin: 12px 0 4px; } .opc { font-weight: 400; color: var(--suave); }
+  input, select { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 10px; background: #fff; color: var(--txt); }
+  input:focus, select:focus { outline: 2px solid var(--morado-2); border-color: transparent; }
+  .fila2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } @media (max-width: 520px) { .fila2, .premio { grid-template-columns: 1fr; } }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 600; margin-top: 12px; } .check input { width: 22px; height: 22px; flex: none; margin-top: 2px; }
+  .botones { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+  button, .boton { font: 600 16px inherit; border: 0; border-radius: 12px; padding: 12px 18px; background: var(--morado); color: #fff; cursor: pointer; text-decoration: none; display: inline-block; }
+  button.sec { background: #fff; color: var(--morado); border: 1px solid var(--morado); } button:disabled { opacity: .45; cursor: not-allowed; }
+  .opcion { border: 2px solid var(--borde); border-radius: 12px; padding: 12px; margin: 8px 0; cursor: pointer; display: flex; gap: 10px; }
+  .opcion input { width: 20px; height: 20px; flex: none; margin-top: 3px; } .opcion.on { border-color: var(--morado-2); background: #f6effc; } .opcion small { display: block; color: var(--suave); font-weight: 400; }
+  .doc { font-family: 'Times New Roman', serif; font-size: 14px; border: 1px solid var(--borde); border-radius: 8px; padding: 18px; background: #fff; line-height: 1.45; }
+  .doc .c { text-align: center; } .doc table { width: 100%; border-collapse: collapse; } .doc td { vertical-align: top; padding: 4px 0; } .doc td:first-child { font-weight: 700; width: 38%; padding-right: 8px; }
+  #lienzo { width: 100%; height: 180px; border: 2px dashed var(--morado-2); border-radius: 12px; background: #fff; touch-action: none; display: block; }
+  .archivo { border: 1px solid var(--borde); border-radius: 12px; padding: 12px; margin: 10px 0; } .archivo .estado { font-size: 13px; margin-top: 6px; }
+  .ok { color: var(--verde); font-weight: 600; } .error { color: var(--rojo); font-weight: 600; } .suave { color: var(--suave); }
+  .oculto { display: none !important; }
+</style>
+</head>
+<body>
+<header><img src="img/logo.webp" alt=""><div><b>Cuenta de cobro del premio</b><span>II Festival de la Canción Brilla &amp; Canta 2026</span></div></header>
+<main id="app"><div class="card">Cargando…</div></main>
+<script src="js/jspdf.umd.min.js"></script>
+<script type="module">
+import { leer, guardar, conReintentos, TS } from './js/rest.js';
+import { CORPORACION, NIT, CORREO, pesos, fechaLarga, numeroCuenta, valorEnLetras, concepto, identificacion, direccion, notaPago, crearPDF } from './js/cuenta-cobro.js';
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const qs = new URLSearchParams(location.search);
+const CID = (qs.get('p') || '').trim(), K = (qs.get('k') || '').trim();
+const app = $('#app');
+const ORDINAL = { 1: 'Primer lugar', 2: 'Segundo lugar', 3: 'Tercer lugar', 4: 'Cuarto lugar', 5: 'Quinto lugar' };
+const CAT = { 'Pre-infantil': 'Pre-Infantil', Infantil: 'Infantil', Juvenil: 'Juvenil', 'Sénior': 'Sénior' };
+const BANCOS = ['Bancolombia', 'Banco de Bogotá', 'Banco Davivienda', 'BBVA Colombia', 'Banco de Occidente', 'Banco Popular', 'Banco AV Villas', 'Banco Caja Social', 'Banco Agrario de Colombia',
+  'Scotiabank Colpatria', 'Banco Itaú', 'Banco GNB Sudameris', 'Banco Falabella', 'Banco Pichincha', 'Bancoomeva', 'Banco W', 'Banco Finandina', 'Banco Mundo Mujer', 'Bancamía',
+  'Banco Cooperativo Coopcentral', 'Banco Serfinanza', 'Lulo Bank', 'Nu Colombia', 'Nequi (Bancolombia)', 'Daviplata (Davivienda)', 'Otro'];
+const PARENTESCO = ['madre', 'padre', 'abuela', 'abuelo', 'tía', 'tío', 'hermana', 'hermano', 'acudiente'];
+
+let premio = null, previo = null, paso = 0;
+const borrador = cargarBorrador();
+let d = Object.assign({ tipoDoc: 'C.C.', tipoCuenta: 'Ahorros', parentesco: '' }, borrador.d || {});
+let firma = borrador.firma || null, modoFirma = borrador.modoFirma || '', entrega = borrador.entrega || 'digital';
+const archivos = {};     // tipo -> { nombre, mime, b64 }
+
+function cargarBorrador() { try { return JSON.parse(localStorage.getItem('cobro_' + CID) || '{}'); } catch (e) { return {}; } }
+function guardarBorrador() { try { localStorage.setItem('cobro_' + CID, JSON.stringify({ d, firma, modoFirma, entrega })); } catch (e) {} }
+const esSenior = () => premio && premio.cat === 'Sénior';
+
+async function iniciar() {
+  if (!CID || !K) return mensaje('Enlace incompleto', 'Abra el enlace exactamente como se lo enviamos por WhatsApp. Si el problema sigue, escríbanos.');
+  try {
+    premio = await leer('premios/' + CID);
+    if (!premio) return mensaje('Enlace no válido', 'No encontramos este premio. Verifique el enlace que le enviamos.');
+    premio.id = CID;
+    previo = await leer(`cobros/${CID}/${K}`);
+  } catch (e) {
+    if (e.permiso) return mensaje('Enlace no válido', 'Este enlace no corresponde al premio o ya no está activo. Pida a la Corporación su enlace personal.');
+    return mensaje('Sin conexión', 'Revise su conexión a internet y vuelva a abrir el enlace.');
+  }
+  if (esSenior()) d.parentesco = 'participante';
+  if (previo && previo.datos) { d = Object.assign(d, previo.datos); modoFirma = d.modoFirma || modoFirma; entrega = d.entrega || entrega; }
+  paso = previo && previo.t ? 5 : 0;
+  pintar();
+}
+function mensaje(t, txt) { app.innerHTML = `<div class="card"><h1>${esc(t)}</h1><p>${esc(txt)}</p><p class="suave">${CORREO}</p></div>`; }
+const barra = () => `<div class="pasos">${[0, 1, 2, 3].map((i) => `<div class="${i <= paso ? 'on' : ''}"></div>`).join('')}</div>`;
+const tarjetaPremio = () => `<div class="premio">
+  <div><small>Participante</small><b>${esc(premio.nombre)}</b></div><div><small>Categoría</small><b>${esc(CAT[premio.cat])}</b></div>
+  <div><small>Puesto</small><b>${ORDINAL[premio.puesto]}</b></div><div class="valor"><small>Valor del premio</small><b>${pesos(premio.valor)}</b></div></div>`;
+
+function pintar() {
+  window.scrollTo(0, 0);
+  [p0, p1, p2, p3, p3, p5][paso]();
+}
+
+// ---------------- paso 0: bienvenida y autorización ----------------
+function p0() {
+  app.innerHTML = `${barra()}<div class="card"><h1>¡Felicitaciones!</h1>
+    <p>Este es el formulario para cobrar el premio de la Gran Final. Le toma unos 10 minutos.</p>${tarjetaPremio()}</div>
+  <div class="card"><h2>Antes de empezar, tenga a mano</h2><ul>
+    ${esSenior() ? '<li>Su <b>cédula</b> (foto por ambos lados).</li><li>La <b>certificación bancaria</b> de una cuenta a su nombre.</li>'
+      : `<li>La <b>cédula de la persona que va a cobrar</b> (madre, padre o acudiente de ${esc(premio.nombre.split(' ')[0])}). Foto por ambos lados.</li><li>La <b>certificación bancaria</b> de una cuenta <b>a nombre de esa misma persona</b>.</li>`}
+    <li>La certificación bancaria se descarga gratis desde la app o la página del banco, o se pide en una oficina.</li></ul>
+    <div class="aviso">Al final usted podrá <b>firmar en la pantalla con el dedo</b>, o descargar el documento para firmarlo a mano. También puede entregar los documentos en papel si lo prefiere.</div></div>
+  <div class="card"><h2>Autorización de tratamiento de datos personales</h2>
+    <div class="legal">De acuerdo con la Ley 1581 de 2012 y el Decreto 1377 de 2013, autorizo a la ${CORPORACION}, NIT ${NIT}, como responsable del tratamiento, para recolectar, almacenar y usar mis datos personales (nombre, documento de identidad, dirección, teléfono, correo electrónico y datos bancarios) y los documentos que adjunto (copia de la cédula, certificación bancaria y cuenta de cobro), con la única finalidad de tramitar y pagar el premio del II Festival de la Canción Brilla &amp; Canta 2026 y conservarlos como soporte contable durante el tiempo que exige la ley. Los datos del participante se limitan a su nombre y a su participación en el festival. Sé que tengo derecho a conocer, actualizar, rectificar y suprimir mis datos y a revocar esta autorización escribiendo a ${CORREO}, y que no estoy obligado(a) a entregar datos sensibles. Mis datos no se venderán ni se compartirán con terceros, salvo las entidades bancarias y autoridades que lo requieran para el pago.</div>
+    <label class="check"><input type="checkbox" id="acepto" ${d.autoriza ? 'checked' : ''}> He leído y acepto la autorización de tratamiento de datos.</label>
+    <div class="botones"><button id="sig" ${d.autoriza ? '' : 'disabled'}>Continuar</button></div></div>`;
+  $('#acepto').onchange = (e) => { d.autoriza = e.target.checked; $('#sig').disabled = !d.autoriza; guardarBorrador(); };
+  $('#sig').onclick = () => { paso = 1; pintar(); };
+}
+
+// ---------------- paso 1: datos ----------------
+function campo(id, etq, extra = '', opc = false) { return `<label for="${id}">${etq}${opc ? ' <span class="opc">(opcional)</span>' : ''}</label><input id="${id}" value="${esc(d[id] || '')}" ${extra}>`; }
+function select(id, etq, opciones, vacio = '') { return `<label for="${id}">${etq}</label><select id="${id}">${vacio ? `<option value="">${vacio}</option>` : ''}${opciones.map((o) => `<option ${d[id] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`; }
+function p1() {
+  app.innerHTML = `${barra()}<div class="card"><h1>Datos de quien cobra</h1>
+    <p class="suave">${esSenior() ? 'Como participante de la categoría Sénior, usted mismo(a) cobra el premio.' : `Escriba los datos de la persona mayor de edad que cobrará el premio de ${esc(premio.nombre)}. La cuenta bancaria debe estar a nombre de esta misma persona.`}</p>
+    ${esSenior() ? '' : `<label for="parentesco">Relación con ${esc(premio.nombre.split(' ')[0])}</label><select id="parentesco"><option value="">Escoja…</option>${PARENTESCO.map((o) => `<option value="${o}" ${d.parentesco === o ? 'selected' : ''}>${o.charAt(0).toUpperCase() + o.slice(1)}</option>`).join('')}</select>`}
+    ${campo('nombre', 'Nombre completo (como aparece en la cédula)', 'autocomplete="name"')}
+    <div class="fila2"><div>${select('tipoDoc', 'Tipo de documento', ['C.C.', 'C.E.', 'P.P.T.', 'Pasaporte'])}</div><div>${campo('documento', 'Número de documento', 'inputmode="numeric" autocomplete="off"')}</div></div>
+    ${campo('direccion', 'Dirección de residencia', 'autocomplete="street-address"')}
+    ${campo('municipio', 'Municipio', 'placeholder="Ej. San José de Cúcuta"')}
+    <div class="fila2"><div>${campo('celular', 'Celular', 'inputmode="tel" autocomplete="tel"')}</div><div>${campo('correo', 'Correo electrónico', 'type="email" autocomplete="email"', true)}</div></div>
+  </div>
+  <div class="card"><h2>Cuenta bancaria para el pago</h2>
+    ${select('banco', 'Banco', BANCOS, 'Escoja…')}
+    <div class="fila2"><div>${select('tipoCuenta', 'Tipo de cuenta', ['Ahorros', 'Corriente', 'Depósito de bajo monto'])}</div><div>${campo('cuenta', 'Número de cuenta', 'inputmode="numeric" autocomplete="off"')}</div></div>
+    <p class="suave" style="font-size:13px">Debe coincidir con la certificación bancaria que adjuntará.</p>
+    <p id="err" class="error"></p>
+    <div class="botones"><button class="sec" id="atras">Atrás</button><button id="sig">Ver mi cuenta de cobro</button></div></div>`;
+  const campos = ['parentesco', 'nombre', 'tipoDoc', 'documento', 'direccion', 'municipio', 'celular', 'correo', 'banco', 'tipoCuenta', 'cuenta'];
+  campos.forEach((k) => { const el = $('#' + k); if (el) el.oninput = el.onchange = () => { d[k] = el.value.trim(); guardarBorrador(); }; });
+  $('#atras').onclick = () => { paso = 0; pintar(); };
+  $('#sig').onclick = () => {
+    campos.forEach((k) => { const el = $('#' + k); if (el) d[k] = el.value.trim(); });
+    d.nombre = d.nombre.replace(/\s+/g, ' ');
+    d.documento = d.documento.replace(/[^\dA-Za-z]/g, ''); d.cuenta = (d.cuenta || '').replace(/[^\d]/g, ''); d.celular = (d.celular || '').replace(/[^\d]/g, '');
+    const falta = [];
+    if (!esSenior() && !d.parentesco) falta.push('la relación con el participante');
+    if (d.nombre.split(' ').length < 2) falta.push('el nombre completo');
+    if (d.documento.length < 5) falta.push('el número de documento');
+    if (!d.direccion) falta.push('la dirección'); if (!d.municipio) falta.push('el municipio');
+    if (d.celular.length !== 10) falta.push('un celular de 10 dígitos');
+    if (d.correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.correo)) falta.push('un correo válido');
+    if (!d.banco) falta.push('el banco'); if (d.cuenta.length < 6) falta.push('el número de cuenta');
+    if (falta.length) { $('#err').textContent = 'Falta o está incompleto: ' + falta.join(', ') + '.'; return; }
+    guardarBorrador(); paso = 2; pintar();
+  };
+}
+
+// ---------------- paso 2: revisar y firmar ----------------
+const vistaDocumento = () => `<div class="doc">
+  <p>San José de Cúcuta, ${fechaLarga()}</p><p class="c">Cuenta de Cobro N.º ${numeroCuenta(premio)}</p>
+  <p class="c"><b>${CORPORACION}<br>NIT: ${NIT}</b></p><p class="c">DEBE A:</p>
+  <table><tr><td>NOMBRE:</td><td>${esc(d.nombre)}</td></tr><tr><td>IDENTIFICACIÓN:</td><td>${esc(identificacion(d))}</td></tr>
+  <tr><td>DIRECCIÓN:</td><td>${esc(direccion(d))}</td></tr><tr><td>CONCEPTO:</td><td>${esc(concepto(premio, d))}</td></tr>
+  <tr><td>LA SUMA DE:</td><td>${pesos(premio.valor)} (${valorEnLetras(premio.valor)})</td></tr></table>
+  <p>${esc(notaPago(d))}</p><p>Cordialmente,</p>
+  ${firma && modoFirma === 'pantalla' ? `<img src="${firma}" alt="Firma" style="height:70px;display:block;margin-bottom:-8px">` : '<div style="height:60px"></div>'}
+  <div style="border-top:1px solid #333;width:220px"></div><b>${esc(d.nombre)}</b><br>${esc(identificacion(d))}<br>TELÉFONO CELULAR: ${esc(d.celular)}</div>`;
+function p2() {
+  app.innerHTML = `${barra()}<div class="card"><h1>Revise su cuenta de cobro</h1><p class="suave">Si algo está mal, vuelva atrás y corríjalo.</p>${vistaDocumento()}</div>
+  <div class="card"><h2>¿Cómo la va a firmar?</h2>
+    <label class="opcion ${modoFirma === 'pantalla' ? 'on' : ''}"><input type="radio" name="mf" value="pantalla" ${modoFirma === 'pantalla' ? 'checked' : ''}><span>Firmar aquí con el dedo<small>Lo más rápido. La firma queda en el documento y se envía con un clic.</small></span></label>
+    <label class="opcion ${modoFirma === 'mano' ? 'on' : ''}"><input type="radio" name="mf" value="mano" ${modoFirma === 'mano' ? 'checked' : ''}><span>Descargarla y firmarla a mano<small>La imprime, la firma y luego sube una foto o la entrega en papel.</small></span></label>
+    <div id="zona-firma" class="${modoFirma === 'pantalla' ? '' : 'oculto'}"><p class="suave" style="font-size:14px;margin:10px 0 6px">Firme dentro del recuadro como lo hace en su cédula.</p>
+      <canvas id="lienzo"></canvas><div class="botones" style="margin-top:8px"><button class="sec" id="borrar">Borrar y volver a firmar</button></div></div>
+    <p id="err" class="error"></p>
+    <div class="botones"><button class="sec" id="atras">Atrás</button><button class="sec" id="pdf">Descargar PDF</button><button id="sig">Continuar</button></div></div>`;
+  document.querySelectorAll('input[name=mf]').forEach((r) => (r.onchange = () => { modoFirma = r.value; guardarBorrador(); pintar(); }));
+  if (modoFirma === 'pantalla') prepararLienzo();
+  $('#atras').onclick = () => { paso = 1; pintar(); };
+  $('#pdf').onclick = () => { leerFirma(); crearPDF(premio, d, modoFirma === 'pantalla' ? firma : null).save(`Cuenta_de_cobro_${numeroCuenta(premio)}.pdf`); };
+  $('#sig').onclick = () => {
+    leerFirma();
+    if (!modoFirma) return ($('#err').textContent = 'Escoja cómo va a firmar.');
+    if (modoFirma === 'pantalla' && !firma) return ($('#err').textContent = 'Firme dentro del recuadro antes de continuar.');
+    guardarBorrador(); paso = 3; pintar();
+  };
+}
+let trazos = 0;
+function prepararLienzo() {
+  const c = $('#lienzo'), r = c.getBoundingClientRect(), k = window.devicePixelRatio || 1;
+  c.width = r.width * k; c.height = r.height * k;
+  const g = c.getContext('2d'); g.scale(k, k); g.lineWidth = 2.4; g.lineCap = g.lineJoin = 'round'; g.strokeStyle = '#111';
+  if (firma) { const im = new Image(); im.onload = () => g.drawImage(im, 0, 0, r.width, r.height); im.src = firma; trazos = 1; } else trazos = 0;
+  let dib = false, u = null;
+  const pt = (e) => { const b = c.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; };
+  c.onpointerdown = (e) => { dib = true; u = pt(e); c.setPointerCapture(e.pointerId); };
+  c.onpointermove = (e) => { if (!dib) return; const p = pt(e); g.beginPath(); g.moveTo(u.x, u.y); g.lineTo(p.x, p.y); g.stroke(); u = p; trazos++; };
+  c.onpointerup = c.onpointercancel = () => { dib = false; leerFirma(); guardarBorrador(); };
+  $('#borrar').onclick = () => { g.clearRect(0, 0, c.width, c.height); firma = null; trazos = 0; guardarBorrador(); };
+}
+function leerFirma() { const c = $('#lienzo'); if (c && modoFirma === 'pantalla' && trazos > 3) firma = c.toDataURL('image/png'); }
+
+// ---------------- paso 3: documentos ----------------
+const TIPOS = [['cedula', 'Cédula de quien cobra — frente', true], ['cedula2', 'Cédula — respaldo', true], ['certificacion', 'Certificación bancaria', true]];
+function p3() {
+  const necesitaCuenta = modoFirma === 'mano';
+  app.innerHTML = `${barra()}<div class="card"><h1>Documentos</h1>
+    <label class="opcion ${entrega === 'digital' ? 'on' : ''}"><input type="radio" name="en" value="digital" ${entrega === 'digital' ? 'checked' : ''}><span>Subirlos aquí<small>Fotos claras o archivos PDF.</small></span></label>
+    <label class="opcion ${entrega === 'fisico' ? 'on' : ''}"><input type="radio" name="en" value="fisico" ${entrega === 'fisico' ? 'checked' : ''}><span>Los entregaré en papel<small>Imprima la cuenta de cobro, fírmela y llévela con la copia de la cédula y la certificación bancaria a la Corporación.</small></span></label>
+    <div id="subir" class="${entrega === 'digital' ? '' : 'oculto'}">
+      ${necesitaCuenta ? '<div class="archivo"><b>Cuenta de cobro firmada a mano</b><br><span class="suave" style="font-size:13px">Descárguela, imprímala, fírmela y tómele una foto completa.</span><input type="file" data-tipo="cuenta" accept="image/*,application/pdf"><div class="estado" id="e-cuenta"></div></div>' : '<div class="archivo"><b>Cuenta de cobro</b><div class="estado ok">✓ Firmada en la pantalla: se enviará automáticamente.</div></div>'}
+      ${TIPOS.map(([t, etq]) => `<div class="archivo"><b>${etq}</b><input type="file" data-tipo="${t}" accept="image/*,application/pdf"><div class="estado" id="e-${t}"></div></div>`).join('')}
+    </div>
+    <p id="err" class="error"></p>
+    <div class="botones"><button class="sec" id="atras">Atrás</button><button class="sec" id="pdf">Descargar PDF</button><button id="enviar">Enviar a la Corporación</button></div></div>`;
+  document.querySelectorAll('input[name=en]').forEach((r) => (r.onchange = () => { entrega = r.value; guardarBorrador(); pintar(); }));
+  document.querySelectorAll('input[type=file]').forEach((inp) => (inp.onchange = () => prepararArchivo(inp)));
+  Object.keys(archivos).forEach((t) => { const e = $('#e-' + t); if (e) e.innerHTML = `<span class="ok">✓ ${esc(archivos[t].nombre)}</span>`; });
+  $('#atras').onclick = () => { paso = 2; pintar(); };
+  $('#pdf').onclick = () => crearPDF(premio, d, modoFirma === 'pantalla' ? firma : null).save(`Cuenta_de_cobro_${numeroCuenta(premio)}.pdf`);
+  $('#enviar').onclick = enviar;
+}
+async function prepararArchivo(inp) {
+  const t = inp.dataset.tipo, f = inp.files[0], e = $('#e-' + t); if (!f) return;
+  e.textContent = 'Preparando…';
+  try {
+    if (f.type.startsWith('image/')) archivos[t] = { nombre: f.name.replace(/\.[^.]+$/, '') + '.jpg', mime: 'image/jpeg', b64: await comprimir(f) };
+    else if (f.type === 'application/pdf') { if (f.size > 5e6) throw new Error('El PDF pesa más de 5 MB. Envíe una foto.'); archivos[t] = { nombre: f.name, mime: 'application/pdf', b64: await aBase64(f) }; }
+    else throw new Error('Formato no admitido. Use una foto o un PDF.');
+    e.innerHTML = `<span class="ok">✓ ${esc(archivos[t].nombre)} (${Math.round(archivos[t].b64.length * 0.75 / 1024)} KB)</span>`;
+  } catch (err) { delete archivos[t]; e.innerHTML = `<span class="error">${esc(err.message)}</span>`; }
+}
+const aBase64 = (f) => new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = mal; r.readAsDataURL(f); });
+async function comprimir(f) {
+  const url = URL.createObjectURL(f);
+  const im = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error('No se pudo leer la imagen.')); i.src = url; });
+  const k = Math.min(1, 1800 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+  c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+  c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+  return c.toDataURL('image/jpeg', 0.82).split(',')[1];
+}
+async function enviar() {
+  const err = $('#err'), b = $('#enviar'); err.textContent = '';
+  if (entrega === 'digital') {
+    const falta = TIPOS.filter(([t]) => !archivos[t]).map(([, e]) => e.toLowerCase());
+    if (modoFirma === 'mano' && !archivos.cuenta) falta.unshift('la cuenta de cobro firmada');
+    if (falta.length) return (err.textContent = 'Falta adjuntar: ' + falta.join(', ') + '.');
+  }
+  b.disabled = true;
+  const base = `cobros/${CID}/${K}`;
+  try {
+    b.textContent = 'Enviando datos…';
+    await conReintentos(() => guardar(base + '/datos', { ...d, autoriza: true, modoFirma, entrega }));
+    const subir = { ...archivos };
+    if (modoFirma === 'pantalla') subir.cuenta = { nombre: `Cuenta_de_cobro_${numeroCuenta(premio)}.pdf`, mime: 'application/pdf', b64: crearPDF(premio, d, firma).output('datauristring').split(',')[1] };
+    if (entrega === 'fisico') { for (const t of ['cedula', 'cedula2', 'certificacion']) delete subir[t]; if (modoFirma === 'mano') delete subir.cuenta; }
+    let i = 0;
+    for (const [t, a] of Object.entries(subir)) { b.textContent = `Subiendo documento ${++i} de ${Object.keys(subir).length}…`; await conReintentos(() => guardar(`${base}/archivos/${t}`, { ...a, t: TS })); }
+    await conReintentos(() => guardar(base + '/t', TS));
+    await conReintentos(() => guardar(`cobrosEstado/${CID}/envio`, { k: K, nombre: d.nombre, documento: `${d.tipoDoc} ${d.documento}`, parentesco: d.parentesco, celular: d.celular,
+      modoFirma, entrega, archivos: Object.fromEntries(Object.keys(subir).map((t) => [t, true])), t: TS }));
+    paso = 5; pintar();
+  } catch (e) {
+    b.disabled = false; b.textContent = 'Enviar a la Corporación';
+    err.textContent = e.permiso ? 'La Corporación ya cerró la recepción de este cobro. Comuníquese con nosotros.' : 'No se pudo enviar (revise su conexión) y vuelva a intentarlo.';
+  }
+}
+
+// ---------------- paso 5: listo ----------------
+function p5() {
+  app.innerHTML = `<div class="card"><h1>✓ ¡Listo!</h1>
+    <p>${previo && previo.t && !Object.keys(archivos).length ? 'Ya habíamos recibido su cuenta de cobro.' : 'Recibimos su cuenta de cobro.'} La Corporación revisará los documentos y le avisará cuando haga el pago.</p>${tarjetaPremio()}
+    ${entrega === 'fisico' || (d.entrega === 'fisico') ? '<div class="aviso" style="margin-top:12px"><b>Recuerde:</b> imprima la cuenta de cobro, fírmela y entréguela con la copia de la cédula y la certificación bancaria.</div>' : ''}
+    <div class="botones"><button id="pdf">Descargar mi cuenta de cobro</button><button class="sec" id="editar">Corregir y volver a enviar</button></div>
+    <p class="suave" style="font-size:13px;margin-top:14px">¿Dudas? Escríbanos a ${CORREO}.</p></div>`;
+  $('#pdf').onclick = () => crearPDF(premio, d, (d.modoFirma || modoFirma) === 'pantalla' ? firma : null).save(`Cuenta_de_cobro_${numeroCuenta(premio)}.pdf`);
+  $('#editar').onclick = () => { paso = 1; pintar(); };
+}
+iniciar();
+</script>
+</body>
+</html>

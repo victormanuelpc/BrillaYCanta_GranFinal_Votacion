@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Cuentas de cobro · Brilla & Canta</title>
+<link rel="icon" href="img/favicon.png">
+<link rel="stylesheet" href="css/base.css">
+<style>
+  table.tabla { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .tabla th { text-align: left; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--texto-suave); padding: 8px 6px; border-bottom: 1px solid var(--panel-borde); position: sticky; top: 0; background: #1a0829; }
+  .tabla td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: middle; }
+  .tabla td.n, .tabla th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .envoltura-tabla { overflow: auto; max-height: 75vh; }
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: rgba(255,255,255,.1); white-space: nowrap; }
+  .chip.verde { background: rgba(47,209,128,.2); color: #8ff0bf; } .chip.oro { background: rgba(245,196,81,.2); color: var(--oro); } .chip.rojo { background: rgba(255,90,95,.2); color: #ffb3b5; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi { background: rgba(0,0,0,.22); border-radius: 14px; padding: 12px; } .kpi b { display: block; font: 800 1.5rem var(--display); color: var(--oro); } .kpi span { font-size: .8rem; color: var(--texto-suave); }
+  .acciones { display: flex; gap: 6px; flex-wrap: wrap; } select.chico { width: auto; padding: 4px 6px; font-size: .85rem; }
+</style>
+</head>
+<body>
+<div id="cab"></div>
+<main class="contenedor ancho" id="app"><div class="tarjeta centro suave">Conectando…</div></main>
+<script src="js/jszip.min.js"></script>
+<script type="module">
+import { fb, r, ahora, sesion, $, $$, esc, aviso, esPermiso, htmlEncabezado, URL_BASE } from './js/comun.js';
+import { pesos, numeroCuenta } from './js/cuenta-cobro.js';
+
+// Ganadores de la Gran Final (resultados oficiales de la plataforma)
+const PREMIOS = [{"id": "E233", "nombre": "Ela Sofía Carvajal Bautista", "cat": "Pre-infantil", "puesto": 1, "valor": 300000, "orden": 1}, {"id": "E111", "nombre": "Lisbeth Valentina Díaz Serrano", "cat": "Pre-infantil", "puesto": 1, "valor": 300000, "orden": 2}, {"id": "E078", "nombre": "Darvin Elieth Vaca Ascanio", "cat": "Pre-infantil", "puesto": 2, "valor": 300000, "orden": 3}, {"id": "E091", "nombre": "Eilyn Gabriela Barreto Castro", "cat": "Pre-infantil", "puesto": 2, "valor": 300000, "orden": 4}, {"id": "E040", "nombre": "Saray Aanisa Garnica Gutiérrez", "cat": "Pre-infantil", "puesto": 3, "valor": 300000, "orden": 5}, {"id": "E007", "nombre": "Emily Fernanda Rojas Rangel", "cat": "Pre-infantil", "puesto": 3, "valor": 300000, "orden": 6}, {"id": "E006", "nombre": "Evelyn Fiorella Rojas Rangel", "cat": "Pre-infantil", "puesto": 3, "valor": 300000, "orden": 7}, {"id": "A180", "nombre": "Jhoangel del Jesús Pino Salazar", "cat": "Infantil", "puesto": 1, "valor": 500000, "orden": 8}, {"id": "A061", "nombre": "Nathalia Angelys Rojas Mejía", "cat": "Infantil", "puesto": 2, "valor": 400000, "orden": 9}, {"id": "A088", "nombre": "Dilan Mateo Loaiza Torrado", "cat": "Infantil", "puesto": 3, "valor": 300000, "orden": 10}, {"id": "A012", "nombre": "Lucia Elisabet Arévalo Cubillos", "cat": "Infantil", "puesto": 4, "valor": 200000, "orden": 11}, {"id": "A034", "nombre": "Sara Luciana Díaz Márquez", "cat": "Infantil", "puesto": 5, "valor": 100000, "orden": 12}, {"id": "B197", "nombre": "Mariana Mejía Tarazona", "cat": "Juvenil", "puesto": 1, "valor": 500000, "orden": 13}, {"id": "B160", "nombre": "Heillyn Vashell Durán González", "cat": "Juvenil", "puesto": 2, "valor": 400000, "orden": 14}, {"id": "B050", "nombre": "Yosneyder Arévalo Palacio", "cat": "Juvenil", "puesto": 3, "valor": 300000, "orden": 15}, {"id": "B026", "nombre": "Danna Alexandra Gamboa Sierra", "cat": "Juvenil", "puesto": 4, "valor": 200000, "orden": 16}, {"id": "B250", "nombre": "Nicole Tatiana Farelo Parra", "cat": "Juvenil", "puesto": 5, "valor": 100000, "orden": 17}, {"id": "C236", "nombre": "María Isabel Jaimes Peñaranda", "cat": "Sénior", "puesto": 1, "valor": 500000, "orden": 18}, {"id": "C064", "nombre": "Jhoan Sebastián Moncada Laguado", "cat": "Sénior", "puesto": 2, "valor": 400000, "orden": 19}, {"id": "C231", "nombre": "Melany Gómez Urda", "cat": "Sénior", "puesto": 3, "valor": 300000, "orden": 20}, {"id": "C193", "nombre": "Karoll Ximena Espitia Rojas", "cat": "Sénior", "puesto": 4, "valor": 200000, "orden": 21}, {"id": "C025", "nombre": "Linda Nayeli Ortíz Pérez", "cat": "Sénior", "puesto": 5, "valor": 100000, "orden": 22}];
+const ORD = { 1: '1.er lugar', 2: '2.º lugar', 3: '3.er lugar', 4: '4.º lugar', 5: '5.º lugar' };
+const CAT = { 'Pre-infantil': 'Pre-Infantil', Infantil: 'Infantil', Juvenil: 'Juvenil', 'Sénior': 'Sénior' };
+$('#cab').innerHTML = htmlEncabezado({ inicio: true });
+const app = $('#app');
+let premios = {}, claves = {}, estados = {}, U = null;
+
+function login(msg = '') {
+  app.innerHTML = `<form class="tarjeta" id="f" style="max-width:420px;margin:40px auto"><h2>Cuentas de cobro</h2><p class="suave">Ingresa el código de administrador.</p>
+    <div class="campo"><input id="codigo" type="password" autocomplete="current-password" placeholder="Código"></div><button class="boton bloque">Entrar</button>
+    ${msg ? `<p style="color:#ffb3b5">${esc(msg)}</p>` : ''}</form>`;
+  $('#f').onsubmit = async (e) => { e.preventDefault();
+    try { await fb.set(r('admins/' + U.uid), { codigo: $('#codigo').value.trim(), t: ahora() }); arrancar(); }
+    catch (err) { login(esPermiso(err) ? 'Código incorrecto.' : 'Sin conexión.'); } };
+}
+const clave = () => { const a = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return Array.from(crypto.getRandomValues(new Uint32Array(20)), (x) => a[x % a.length]).join(''); };
+const enlace = (id) => `${URL_BASE}cobro.html?p=${id}&k=${claves[id]}`;
+const mensajeWA = (p) => `Hola. Les saluda la Corporación Artística y Cultural Brilla & Canta. 🎉 Felicitaciones por el ${ORD[p.puesto]} de ${p.nombre} en la categoría ${CAT[p.cat]} de la Gran Final.\n\nPara recibir el premio de ${pesos(p.valor)}, diligencie la cuenta de cobro en este enlace personal (no lo comparta):\n${enlace(p.id)}\n\nTenga a mano la cédula de quien va a cobrar y la certificación bancaria de una cuenta a su nombre.`;
+
+async function crearEnlaces() {
+  const u = {};
+  PREMIOS.forEach((p) => { u['premios/' + p.id] = { nombre: p.nombre, cat: p.cat, puesto: p.puesto, valor: p.valor, orden: p.orden }; if (!claves[p.id]) u['premiosClave/' + p.id] = clave(); });
+  await fb.update(r(''), u); aviso('Lista de premios y enlaces lista');
+}
+function estadoDe(id) {
+  const e = (estados[id] || {}).envio, a = (estados[id] || {}).admin || {};
+  if (!e) return { txt: 'Sin enviar', cls: '' };
+  if (a.revision === 'pagado') return { txt: 'Pagado', cls: 'verde' };
+  if (a.revision === 'aprobado') return { txt: 'Aprobado', cls: 'verde' };
+  if (a.revision === 'corregir') return { txt: 'Debe corregir', cls: 'rojo' };
+  return { txt: e.entrega === 'fisico' ? 'Entregará en papel' : 'Recibido', cls: 'oro' };
+}
+function pintar() {
+  const lista = PREMIOS.filter((p) => premios[p.id]);
+  if (!lista.length) {
+    app.innerHTML = `<div class="tarjeta"><h2>Cuentas de cobro de los premios</h2><p>Aún no se ha creado la lista de ganadores en la plataforma.</p>
+      <p class="suave">Se crearán ${PREMIOS.length} enlaces personales (uno por ganador), con un total de ${pesos(PREMIOS.reduce((a, p) => a + p.valor, 0))}.</p>
+      <button class="boton" id="crear">Crear lista de premios y enlaces</button></div>`;
+    $('#crear').onclick = () => crearEnlaces().catch(() => aviso('No se pudo (¿reglas publicadas?)', 'error'));
+    return;
+  }
+  const env = lista.filter((p) => (estados[p.id] || {}).envio);
+  const total = lista.reduce((a, p) => a + p.valor, 0), pag = lista.filter((p) => ((estados[p.id] || {}).admin || {}).revision === 'pagado');
+  app.innerHTML = `<div class="tarjeta"><h2>Cuentas de cobro de los premios</h2>
+    <div class="kpis"><div class="kpi"><b>${lista.length}</b><span>ganadores</span></div><div class="kpi"><b>${env.length}</b><span>ya enviaron su cuenta de cobro</span></div>
+      <div class="kpi"><b>${pesos(total)}</b><span>total de premios</span></div><div class="kpi"><b>${pesos(pag.reduce((a, p) => a + p.valor, 0))}</b><span>pagado (${pag.length})</span></div></div>
+    <div class="acciones" style="margin-top:12px"><button class="boton chico" id="zip-todo">⬇ Descargar todos los documentos (ZIP)</button><button class="boton secundario chico" id="excel">⬇ Resumen en Excel</button></div></div>
+  <div class="tarjeta"><p class="suave chico">«WhatsApp» copia el mensaje con el enlace personal de cada ganador. «Bloquear» impide que el ganador cambie lo que ya envió (úsalo al aprobar o pagar).</p>
+  <div class="envoltura-tabla"><table class="tabla"><tr><th>Participante</th><th>Categoría</th><th>Puesto</th><th class="n">Valor</th><th>Estado</th><th>Quién cobra</th><th>Documentos</th><th>Revisión</th><th></th></tr>
+  ${lista.map((p) => { const e = (estados[p.id] || {}).envio, a = (estados[p.id] || {}).admin || {}, st = estadoDe(p.id);
+    const docs = e ? (e.entrega === 'fisico' ? 'En papel' : ['cuenta', 'cedula', 'cedula2', 'certificacion'].map((t) => `${e.archivos && e.archivos[t] ? '✓' : '✗'} ${({ cuenta: 'Cuenta', cedula: 'Céd. frente', cedula2: 'Céd. respaldo', certificacion: 'Cert. bancaria' })[t]}`).join('<br>')) : '';
+    return `<tr><td><b>${esc(p.nombre)}</b><br><span class="suave chico">${p.id} · ${numeroCuenta(p)}</span></td><td>${CAT[p.cat]}</td><td>${ORD[p.puesto]}</td><td class="n" style="white-space:nowrap">${pesos(p.valor)}</td>
+      <td><span class="chip ${st.cls}">${st.txt}</span>${e && e.t ? `<br><span class="suave chico">${new Date(e.t).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}</span>` : ''}</td>
+      <td>${e ? `${esc(e.nombre)}<br><span class="suave chico">${esc(e.documento)} · ${esc(e.parentesco === 'participante' ? 'el participante' : e.parentesco)} · ${esc(e.celular)}</span>` : ''}</td><td class="chico">${docs}</td>
+      <td><select class="chico" data-rev="${p.id}">${[['', 'Pendiente'], ['aprobado', 'Aprobado'], ['corregir', 'Debe corregir'], ['pagado', 'Pagado']].map(([v, t]) => `<option value="${v}" ${(a.revision || '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        <label class="chico" style="display:flex;gap:4px;align-items:center;margin-top:4px;color:var(--texto)"><input type="checkbox" style="width:auto" data-blq="${p.id}" ${a.bloqueado ? 'checked' : ''}> Bloquear</label></td>
+      <td><div class="acciones"><button class="boton secundario chico" data-wa="${p.id}">WhatsApp</button><a class="boton secundario chico" href="${enlace(p.id)}" target="_blank" rel="noopener">Abrir</a>${e ? `<button class="boton chico" data-zip="${p.id}">⬇ ZIP</button>` : ''}</div></td></tr>`; }).join('')}
+  </table></div></div>`;
+  $$('[data-wa]').forEach((b) => (b.onclick = () => { const p = PREMIOS.find((x) => x.id === b.dataset.wa); const t = mensajeWA(p);
+    navigator.clipboard.writeText(t).then(() => aviso('Mensaje copiado: pégalo en el chat de WhatsApp del ganador')).catch(() => window.prompt('Copia este mensaje:', t)); }));
+  $$('[data-rev]').forEach((s) => (s.onchange = () => fb.update(r(`cobrosEstado/${s.dataset.rev}/admin`), { revision: s.value || null, t: ahora() })));
+  $$('[data-blq]').forEach((c) => (c.onchange = () => fb.update(r(`cobrosEstado/${c.dataset.blq}/admin`), { bloqueado: c.checked || null })));
+  $$('[data-zip]').forEach((b) => (b.onclick = () => descargarZip([b.dataset.zip]).catch((e) => { console.error(e); aviso('No se pudo armar el ZIP', 'error'); })));
+  $('#zip-todo').onclick = () => descargarZip(lista.filter((p) => (estados[p.id] || {}).envio).map((p) => p.id)).catch((e) => { console.error(e); aviso('No se pudo armar el ZIP', 'error'); });
+  $('#excel').onclick = excel;
+}
+const carpeta = (p) => `${String(p.orden).padStart(2, '0')}_${CAT[p.cat]}_${p.puesto}_${p.nombre}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '_');
+async function descargarZip(ids) {
+  if (!ids.length) return aviso('Aún nadie ha enviado documentos', 'error');
+  aviso('Armando el ZIP…');
+  const zip = new JSZip();
+  for (const id of ids) {
+    const p = PREMIOS.find((x) => x.id === id);
+    const c = (await fb.get(r(`cobros/${id}/${claves[id]}`))).val() || {}; const d = c.datos || {};
+    const f = zip.folder(ids.length > 1 ? carpeta(p) : '');
+    f.file('datos.txt', [`Participante: ${p.nombre} (${p.id})`, `Categoría: ${CAT[p.cat]} · ${ORD[p.puesto]} · ${pesos(p.valor)}`, `Cuenta de cobro N.º ${numeroCuenta(p)}`, '',
+      `Quien cobra: ${d.nombre}`, `Documento: ${d.tipoDoc} ${d.documento}`, `Relación: ${d.parentesco === 'participante' ? 'el participante' : d.parentesco}`, `Dirección: ${d.direccion}, ${d.municipio}`,
+      `Celular: ${d.celular}`, `Correo: ${d.correo || ''}`, `Banco: ${d.banco} · Cuenta ${d.tipoCuenta} N.º ${d.cuenta}`, `Firma: ${d.modoFirma === 'pantalla' ? 'en la pantalla' : 'a mano'} · Entrega: ${d.entrega === 'fisico' ? 'en papel' : 'digital'}`,
+      `Autorizó tratamiento de datos: ${d.autoriza ? 'sí' : 'no'}`, `Enviado: ${c.t ? new Date(c.t).toLocaleString('es-CO') : ''}`].join('\r\n'));
+    const NOM = { cuenta: 'Cuenta_de_cobro', cedula: 'Cedula_frente', cedula2: 'Cedula_respaldo', certificacion: 'Certificacion_bancaria' };
+    Object.entries(c.archivos || {}).forEach(([t, a]) => f.file(`${NOM[t] || t}.${a.mime === 'application/pdf' ? 'pdf' : 'jpg'}`, a.b64, { base64: true }));
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = ids.length > 1 ? 'Cuentas_de_cobro_Gran_Final_2026.zip' : `${carpeta(PREMIOS.find((x) => x.id === ids[0]))}.zip`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function excel() {
+  if (!window.XLSX) await new Promise((ok, mal) => { const s = document.createElement('script'); s.src = 'js/xlsx.full.min.js'; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
+  const filas = PREMIOS.filter((p) => premios[p.id]).map((p) => { const e = (estados[p.id] || {}).envio || {}, a = (estados[p.id] || {}).admin || {};
+    return { 'N.º cuenta': numeroCuenta(p), Participante: p.nombre, Categoría: CAT[p.cat], Puesto: ORD[p.puesto], Valor: p.valor, Estado: estadoDe(p.id).txt, 'Quién cobra': e.nombre || '', Documento: e.documento || '',
+      Relación: e.parentesco === 'participante' ? 'el participante' : (e.parentesco || ''), Celular: e.celular || '', Entrega: e.entrega === 'fisico' ? 'Papel' : e.entrega ? 'Digital' : '', Enviado: e.t ? new Date(e.t).toLocaleString('es-CO') : '', Revisión: a.revision || 'pendiente' }; });
+  const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(filas); ws['!cols'] = [12, 34, 12, 10, 10, 16, 30, 16, 14, 12, 9, 18, 12].map((w) => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Cuentas de cobro'); XLSX.writeFile(wb, 'Cuentas_de_cobro_Gran_Final_2026.xlsx');
+}
+function arrancar() {
+  const oir = (ruta, fn) => fb.onValue(r(ruta), (s) => { fn(s.val() || {}); pintar(); }, () => {});
+  oir('premios', (v) => (premios = v)); oir('premiosClave', (v) => (claves = v)); oir('cobrosEstado', (v) => (estados = v));
+}
+try { U = await sesion(); } catch (e) { app.innerHTML = '<div class="tarjeta centro">No se pudo conectar con Firebase.</div>'; throw e; }
+try { const s = await fb.get(r('admins/' + U.uid)); if (s.exists()) arrancar(); else login(); } catch (e) { login(); }
+</script>
+</body>
+</html>
