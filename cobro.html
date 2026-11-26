@@ -131,10 +131,19 @@ function p1() {
     ${select('banco', 'Banco', BANCOS, 'Escoja…')}
     <div class="fila2"><div>${select('tipoCuenta', 'Tipo de cuenta', ['Ahorros', 'Corriente', 'Depósito de bajo monto'])}</div><div>${campo('cuenta', 'Número de cuenta', 'inputmode="numeric" autocomplete="off"')}</div></div>
     <p class="suave" style="font-size:13px">Debe coincidir con la certificación bancaria que adjuntará.</p>
+  </div>
+  <div class="card"><h2>Llave Bre-B <span class="opc" style="font-size:14px">(recomendada)</span></h2>
+    <div class="aviso">Con la <b>llave Bre-B</b> le podemos enviar el dinero <b>al instante desde cualquier banco</b>, también en fines de semana y festivos.
+      <br><br><b>Ojo:</b> el número de Nequi o de Daviplata, por sí solo, únicamente sirve para recibir dinero desde otra cuenta Nequi o Daviplata. Si nos da su llave, el pago le llega aunque lo hagamos desde otro banco.</div>
+    <p style="font-size:14px;margin:10px 0 4px"><b>¿Dónde la encuentro?</b> En la app de su banco o billetera (Nequi, Daviplata, Bancolombia, Banco de Bogotá, BBVA, Caja Social…), en la opción <b>«Llaves»</b> o <b>«Bre-B»</b>. Por lo general es su número de celular o su número de cédula.</p>
+    <div class="fila2"><div>${select('tipoLlave', 'Tipo de llave', ['Celular', 'Cédula', 'Correo electrónico', 'Alfanumérica (empieza con @)', 'Código de comercio'], 'Escoja…')}</div><div>${campo('llave', 'Mi llave')}</div></div>
+    <label class="check" style="font-weight:400"><input type="checkbox" id="sinLlave" ${d.sinLlave ? 'checked' : ''}> No tengo llave Bre-B o no sé cuál es (el pago se hará a la cuenta de arriba).</label>
     <p id="err" class="error"></p>
     <div class="botones"><button class="sec" id="atras">Atrás</button><button id="sig">Ver mi cuenta de cobro</button></div></div>`;
-  const campos = ['parentesco', 'nombre', 'tipoDoc', 'documento', 'direccion', 'municipio', 'celular', 'correo', 'banco', 'tipoCuenta', 'cuenta'];
+  const campos = ['parentesco', 'nombre', 'tipoDoc', 'documento', 'direccion', 'municipio', 'celular', 'correo', 'banco', 'tipoCuenta', 'cuenta', 'tipoLlave', 'llave'];
   campos.forEach((k) => { const el = $('#' + k); if (el) el.oninput = el.onchange = () => { d[k] = el.value.trim(); guardarBorrador(); }; });
+  $('#sinLlave').onchange = (e) => { d.sinLlave = e.target.checked; if (d.sinLlave) { d.llave = ''; d.tipoLlave = ''; $('#llave').value = ''; $('#tipoLlave').value = ''; } guardarBorrador(); };
+  $('#llave').addEventListener('input', () => { if ($('#llave').value.trim()) { d.sinLlave = false; $('#sinLlave').checked = false; } });
   $('#atras').onclick = () => { paso = 0; pintar(); };
   $('#sig').onclick = () => {
     campos.forEach((k) => { const el = $('#' + k); if (el) d[k] = el.value.trim(); });
@@ -148,6 +157,17 @@ function p1() {
     if (d.celular.length !== 10) falta.push('un celular de 10 dígitos');
     if (d.correo && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.correo)) falta.push('un correo válido');
     if (!d.banco) falta.push('el banco'); if (d.cuenta.length < 6) falta.push('el número de cuenta');
+    if (!d.sinLlave) {
+      const L = d.llave, T = d.tipoLlave;
+      if (!L && !T) falta.push('su llave Bre-B (o marque «No tengo llave Bre-B»)');
+      else if (!T) falta.push('el tipo de llave');
+      else if (!L) falta.push('su llave Bre-B');
+      else if (T === 'Celular' && !/^3\d{9}$/.test(L.replace(/\D/g, ''))) falta.push('una llave de celular de 10 dígitos que empiece por 3');
+      else if (T === 'Cédula' && !/^\d{5,12}$/.test(L.replace(/\D/g, ''))) falta.push('una llave de cédula con solo números');
+      else if (T === 'Correo electrónico' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(L)) falta.push('una llave de correo válida');
+      else if (T.startsWith('Alfanumérica') && !/^@\S{2,}$/.test(L)) falta.push('una llave alfanumérica que empiece por @');
+      if (T === 'Celular' || T === 'Cédula') d.llave = L.replace(/\D/g, '');
+    }
     if (falta.length) { $('#err').textContent = 'Falta o está incompleto: ' + falta.join(', ') + '.'; return; }
     guardarBorrador(); paso = 2; pintar();
   };
@@ -255,7 +275,7 @@ async function enviar() {
     let i = 0;
     for (const [t, a] of Object.entries(subir)) { b.textContent = `Subiendo documento ${++i} de ${Object.keys(subir).length}…`; await conReintentos(() => guardar(`${base}/archivos/${t}`, { ...a, t: TS })); }
     await conReintentos(() => guardar(base + '/t', TS));
-    await conReintentos(() => guardar(`cobrosEstado/${CID}/envio`, { k: K, nombre: d.nombre, documento: `${d.tipoDoc} ${d.documento}`, parentesco: d.parentesco, celular: d.celular,
+    await conReintentos(() => guardar(`cobrosEstado/${CID}/envio`, { k: K, nombre: d.nombre, documento: `${d.tipoDoc} ${d.documento}`, parentesco: d.parentesco, celular: d.celular, llave: d.sinLlave ? '' : (d.llave || ''), tipoLlave: d.sinLlave ? '' : (d.tipoLlave || ''),
       modoFirma, entrega, archivos: Object.fromEntries(Object.keys(subir).map((t) => [t, true])), t: TS }));
     paso = 5; pintar();
   } catch (e) {

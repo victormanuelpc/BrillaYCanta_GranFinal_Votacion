@@ -82,7 +82,7 @@ function pintar() {
     const docs = e ? (e.entrega === 'fisico' ? 'En papel' : ['cuenta', 'cedula', 'cedula2', 'certificacion'].map((t) => `${e.archivos && e.archivos[t] ? '✓' : '✗'} ${({ cuenta: 'Cuenta', cedula: 'Céd. frente', cedula2: 'Céd. respaldo', certificacion: 'Cert. bancaria' })[t]}`).join('<br>')) : '';
     return `<tr><td><b>${esc(p.nombre)}</b><br><span class="suave chico">${p.id} · ${numeroCuenta(p)}</span></td><td>${CAT[p.cat]}</td><td>${ORD[p.puesto]}</td><td class="n" style="white-space:nowrap">${pesos(p.valor)}</td>
       <td><span class="chip ${st.cls}">${st.txt}</span>${e && e.t ? `<br><span class="suave chico">${new Date(e.t).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}</span>` : ''}</td>
-      <td>${e ? `${esc(e.nombre)}<br><span class="suave chico">${esc(e.documento)} · ${esc(e.parentesco === 'participante' ? 'el participante' : e.parentesco)} · ${esc(e.celular)}</span>` : ''}</td><td class="chico">${docs}</td>
+      <td>${e ? `${esc(e.nombre)}<br><span class="suave chico">${esc(e.documento)} · ${esc(e.parentesco === 'participante' ? 'el participante' : e.parentesco)} · ${esc(e.celular)}</span><br><span class="chico">${e.llave ? `🔑 Llave ${esc(e.tipoLlave)}: <b>${esc(e.llave)}</b>` : '<span class="suave">Sin llave Bre-B</span>'}</span>` : ''}</td><td class="chico">${docs}</td>
       <td><select class="chico" data-rev="${p.id}">${[['', 'Pendiente'], ['aprobado', 'Aprobado'], ['corregir', 'Debe corregir'], ['pagado', 'Pagado']].map(([v, t]) => `<option value="${v}" ${(a.revision || '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
         <label class="chico" style="display:flex;gap:4px;align-items:center;margin-top:4px;color:var(--texto)"><input type="checkbox" style="width:auto" data-blq="${p.id}" ${a.bloqueado ? 'checked' : ''}> Bloquear</label></td>
       <td><div class="acciones"><button class="boton secundario chico" data-wa="${p.id}">WhatsApp</button><a class="boton secundario chico" href="${enlace(p.id)}" target="_blank" rel="noopener">Abrir</a>${e ? `<button class="boton chico" data-zip="${p.id}">⬇ ZIP</button>` : ''}</div></td></tr>`; }).join('')}
@@ -106,7 +106,7 @@ async function descargarZip(ids) {
     const f = zip.folder(ids.length > 1 ? carpeta(p) : '');
     f.file('datos.txt', [`Participante: ${p.nombre} (${p.id})`, `Categoría: ${CAT[p.cat]} · ${ORD[p.puesto]} · ${pesos(p.valor)}`, `Cuenta de cobro N.º ${numeroCuenta(p)}`, '',
       `Quien cobra: ${d.nombre}`, `Documento: ${d.tipoDoc} ${d.documento}`, `Relación: ${d.parentesco === 'participante' ? 'el participante' : d.parentesco}`, `Dirección: ${d.direccion}, ${d.municipio}`,
-      `Celular: ${d.celular}`, `Correo: ${d.correo || ''}`, `Banco: ${d.banco} · Cuenta ${d.tipoCuenta} N.º ${d.cuenta}`, `Firma: ${d.modoFirma === 'pantalla' ? 'en la pantalla' : 'a mano'} · Entrega: ${d.entrega === 'fisico' ? 'en papel' : 'digital'}`,
+      `Celular: ${d.celular}`, `Correo: ${d.correo || ''}`, `Banco: ${d.banco} · Cuenta ${d.tipoCuenta} N.º ${d.cuenta}`, `Llave Bre-B: ${d.llave && !d.sinLlave ? `${d.llave} (${d.tipoLlave})` : 'no tiene / no sabe'}`, `Firma: ${d.modoFirma === 'pantalla' ? 'en la pantalla' : 'a mano'} · Entrega: ${d.entrega === 'fisico' ? 'en papel' : 'digital'}`,
       `Autorizó tratamiento de datos: ${d.autoriza ? 'sí' : 'no'}`, `Enviado: ${c.t ? new Date(c.t).toLocaleString('es-CO') : ''}`].join('\r\n'));
     const NOM = { cuenta: 'Cuenta_de_cobro', cedula: 'Cedula_frente', cedula2: 'Cedula_respaldo', certificacion: 'Certificacion_bancaria' };
     Object.entries(c.archivos || {}).forEach(([t, a]) => f.file(`${NOM[t] || t}.${a.mime === 'application/pdf' ? 'pdf' : 'jpg'}`, a.b64, { base64: true }));
@@ -120,7 +120,7 @@ async function excel() {
   if (!window.XLSX) await new Promise((ok, mal) => { const s = document.createElement('script'); s.src = 'js/xlsx.full.min.js'; s.onload = ok; s.onerror = mal; document.head.appendChild(s); });
   const filas = PREMIOS.filter((p) => premios[p.id]).map((p) => { const e = (estados[p.id] || {}).envio || {}, a = (estados[p.id] || {}).admin || {};
     return { 'N.º cuenta': numeroCuenta(p), Participante: p.nombre, Categoría: CAT[p.cat], Puesto: ORD[p.puesto], Valor: p.valor, Estado: estadoDe(p.id).txt, 'Quién cobra': e.nombre || '', Documento: e.documento || '',
-      Relación: e.parentesco === 'participante' ? 'el participante' : (e.parentesco || ''), Celular: e.celular || '', Entrega: e.entrega === 'fisico' ? 'Papel' : e.entrega ? 'Digital' : '', Enviado: e.t ? new Date(e.t).toLocaleString('es-CO') : '', Revisión: a.revision || 'pendiente' }; });
+      Relación: e.parentesco === 'participante' ? 'el participante' : (e.parentesco || ''), Celular: e.celular || '', 'Llave Bre-B': e.llave ? `${e.llave} (${e.tipoLlave})` : (e.t ? 'no tiene' : ''), Entrega: e.entrega === 'fisico' ? 'Papel' : e.entrega ? 'Digital' : '', Enviado: e.t ? new Date(e.t).toLocaleString('es-CO') : '', Revisión: a.revision || 'pendiente' }; });
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(filas); ws['!cols'] = [12, 34, 12, 10, 10, 16, 30, 16, 14, 12, 9, 18, 12].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, 'Cuentas de cobro'); XLSX.writeFile(wb, 'Cuentas_de_cobro_Gran_Final_2026.xlsx');
 }
